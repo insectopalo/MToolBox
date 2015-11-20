@@ -1,15 +1,4 @@
 # coding=utf8
-"""
-Done:
-    - Creato oggetto composition e modificato il comportamento di chi ne fa uso:
-    RegEx e SiteVar (lo script)
-ToDo:
-    - Eliminare il calcolo della composizione dalla classe Alignment
-    - Cambiare i nomi delle funzioni per mantenere una notazione some_funtion invece
-      di someFunction, i nomi delle classi vanno bene cosi'
-    - Col tempo togliere i metodi/attributi nascosti __var e sostituirli coi meno
-      problematici _var (che si sottintende non vadano toccati)
-"""
 
 __deprecated__ = ""
 
@@ -34,7 +23,7 @@ ERR_SEQ_LEN   = 'Sequence in not of correct length, must be %d'
 gap_types = ['?','.']
 
 class BadSequenceType(Exception):
-    """Sollevata quando i tipi di sequenze non coincidono"""
+    """Raised if different sequence types"""
     pass
 
 def contained(seq1, seq2):
@@ -200,8 +189,7 @@ class BaseSequence(object):
         """
         Value can be an array or a string of another instance
         
-        @attention: la lunghezza di value deve essere uguale a quella della stringa
-                    sostituita
+        @attention: length of value must be equal to the length of the substituted string
         """
         #uppercase if string
         if isinstance(value, str):
@@ -368,7 +356,7 @@ class SeqList(FileIO):
     sequence from/to a file
     
     Notes:
-        - getSeqByIndex is manteined for compatibility
+        - getSeqByIndex is maintained for compatibility
           with old package, but will probably removed
     """
     __metaclass__ = autoprop
@@ -380,18 +368,18 @@ class SeqList(FileIO):
         """Adds a sequence, keywords arguments are ignored for now"""
         if 'filetype' in kwds:
             if kwds['filetype'] == 'ncbi_flat':
-                #caso in cui sia una flat entry NCBI
+                #NCBI entry
                 self._seqs.append(NCBI_Entry(kwds['info']))
                 return
-        #se la sequenza è una stringa
+        #if sequence is a string
         if isinstance(seq, str):
             self._seqs.append(self._seq_cls(name, seq))
-        #se è un'istanza della classe usata
+        #If instance of used class
         elif isinstance(seq, self._seq_cls):
             self._seqs.append(seq)
         elif isinstance(seq, array):
             self.seqs.append(self._seq_cls(name, seq.tostring()))
-        #l'indice che va usato per prendere dati all'ncbi
+        #Entrez GI
         if 'gi_index' in kwds:
             self._seqs[-1].gi_index = kwds['gi_index']
     def remove_seqs(self):
@@ -563,8 +551,7 @@ class Alignment(SeqList):
     """
     def __init__(self, seq_cls=BaseSequence, seq_len=None, track=False):
         """
-        track indica se cambiare la lunghezza di tutte le sequenze in base
-        a quella appena aggiunta (ciuccia memoria che è una bellezza)
+        Defines whether to change the length of all sequences based on the last one added
         """
         super(Alignment, self).__init__(seq_cls)
         if seq_len:

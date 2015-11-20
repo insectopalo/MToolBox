@@ -1,0 +1,10 @@
+-Check in is a directory
+-Use pwd as output folder instead of having to go through so many conditionals
+- Support for ultradeep sequencing (samtools mpileup -d / Xmx16g java)
+-Other minor cosmetic changes
+- Fixed the -l argument (if/elses didn't work for list.txt file). Now the argument to -l can be a file
+  or a list of comma separated id's. The file must contain one id per line. It
+  looks first for a file with the argument name, otherwhise it considers it as a list
+- A bit of documentation should be made:
+        - Input file list of IDs can be filename.bam,filename2.bam... etc or just the id (filename1, filename2 etc...)
+          it will be seded anyway

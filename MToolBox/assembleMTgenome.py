@@ -227,7 +227,7 @@ if ext=='bam':
 	os.system(cmd1)
 	os.system(cmd2)
 	print 'Creating pileup...'
-	cmd3='%s mpileup -B -f %s %s-sorted.bam > %s.pileup' %(sexe,hgenome,basext,basext)
+	cmd3='%s mpileup -B -d 100000 -f %s %s-sorted.bam > %s.pileup' %(sexe,hgenome,basext,basext)
 	os.system(cmd3)
 	
 mtdna={}

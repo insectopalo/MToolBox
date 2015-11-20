@@ -1,12 +1,8 @@
-###CHANGELOG - 5 June 2014
+###CHANGELOG - 21 September 2015
 
-- changed the method for estimation of the heteroplasmy confidence interval (CI). For sites with coverage depth <= 40, the heteroplasmy CI is estimated with the Wilson score interval; for larger coverage depth values, the Agresti-Coull interval is used.
-- added the possibility to use fasta inputs to perform haplogroup prediction and functional annotation.
-- added the possibility to use the revised Cambridge Reference Sequence (rCRS) as reference sequence for read mapping. By using rCRS as reference sequence, the VCF output will be rCRS-based. 
+Update to MToolBox version 0.3.1a with the following change:
 
-###CHANGELOG - 19 July 2014
-
-- an error encountered during the bam to fastq extraction has been fixed. Empty unpaired fastq files are now removed.  
+- A bug in patho-table.txt has been fixed. 313 new stop-gain mutations and 6 new missense variants are now included.
 
 ###CHANGELOG - 29 September 2014
 

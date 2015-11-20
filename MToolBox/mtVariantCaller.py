@@ -1006,11 +1006,12 @@ def mtvcf_main_analysis(mtable, sam, name2, tail=5):
 #print dict_of_dicts
 
 def get_consensus_single(i, hf=0.8):
+	consensus_value = []
 	if len(i) != 0:
-		consensus_value = []
+		#consensus_value = []
 		#for var in dict_of_dicts[i]:
 		for var in i:
-			#print var[0], var[-1], max(var[6])
+			print var[0], var[-1], max(var[6])
 			if var[-1] == 'mism' and max(var[6]) >= hf:
 				index=var[6].index(max(var[6]))
 				basevar=var[3][index]

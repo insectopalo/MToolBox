@@ -46,13 +46,13 @@ parser.add_argument("--mt_classifier_OPTS", help="mt-classifier options", \
 f = parser.parse_args()
 #print f
 #print "\nmapExome argument user-defined"
-user_mapExome_opts, user_mapExome_args = getopt.getopt(f.mapExome_OPTS.split(), "ha:b:c:g:D:M:H:t:o:")
+user_mapExome_opts, user_mapExome_args = getopt.getopt(f.mapExome_OPTS.split(), "hsa:b:c:g:D:M:H:t:o:")
 d_user_mapExome = dict(user_mapExome_opts)
 #print d_user_mapExome
 #print "\nmapExome argument defaults"
 default_mapExome_OPTS = parser.get_default("mapExome_OPTS")
 #print default_mapExome_OPTS
-default_mapExome_opts, default_mapExome_args = getopt.getopt(default_mapExome_OPTS.split(), "ha:b:c:g:D:M:H:t:o:")
+default_mapExome_opts, default_mapExome_args = getopt.getopt(default_mapExome_OPTS.split(), "hsa:b:c:g:D:M:H:t:o:")
 d_def_mapExome = dict(default_mapExome_opts)
 #print d_def_mapExome
 
@@ -96,7 +96,7 @@ for i in d_user_assembleMTgenome:
 			if check_file(d_user_assembleMTgenome['-r']+d_user_assembleMTgenome[i], d_user_assembleMTgenome['-r']+d_user_assembleMTgenome[i]) == True:
 				pass
 				print d_user_assembleMTgenome['-r']+d_user_assembleMTgenome[i]
-			else: sys.exit(1)			
+			else: sys.exit(1)
 		if check_file(d_user_assembleMTgenome[i], d_def_assembleMTgenome[i]) == True: pass
 		else: sys.exit(1)
 print "OK."
