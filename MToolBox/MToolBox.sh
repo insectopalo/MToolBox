@@ -63,12 +63,12 @@ MitoExtraction=false
 # Export folder where MToolBox.sh is placed, it is the same folder of PicardTools and GATK jars
 export working_dir=$(pwd)
 export mtoolbox_folder="$(dirname "$(readlink -f "$0")")"
-export externaltoolsfolder=${mtoolbox_folder}/ext_tools/
+export externaltoolsfolder=${mtoolbox_folder}/ext_tools
 export PATH=${mtoolbox_folder}:${externaltoolsfolder}:${PATH}
 
 # Default environment variables for executables and files required by MToolBox
 export ref=RSRS
-export fasta_path=/usr/local/share/genomes/
+export fasta_path=/usr/local/share/genomes
 export mtdb_fasta=chrRSRS.fa
 export hg19_fasta=hg19RSRS.fa
 export gsnapexe=/usr/local/bin/gsnap
@@ -253,11 +253,6 @@ in-out_folders()
 
 fastq_input()
 { # run mapExome directly.
-    # get unique list of sample IDs
-    # sampleIDs=$(ls *fastq* | awk 'BEGIN{FS="."}{count[$1]++}END{for (j in count) print j}')
-    
-    # map against mt genome and human genome
-    # for i in $sampleIDs; do datasets=$(echo $i.*fastq*); mapExome_RSRS_SamHeader.py -g ${gsnapexe} -D ${gsnapdb} -M ${mtdb} -H ${humandb} -a "${datasets}" -o ${output_name}/OUT_${i}; done &> log_mapexome.txt
     echo ""
     echo "##### EXECUTING READ MAPPING WITH MAPEXOME..."
     echo ""
@@ -350,7 +345,10 @@ fastq_input()
     then
         echo "Compression of fastq files from bam/sam input files..."
         mkdir ${output_name}/processed_fastq
-        for i in $sampleIDs; do mv $i*fastq ${output_name}/processed_fastq; done
+        for i in $sampleIDs
+        do
+        mv $i*fastq ${output_name}/processed_fastq
+    done
         cd ${output_name}                            
         tar czf processed_fastq.tar.gz processed_fastq
         rm -r processed_fastq 
@@ -363,12 +361,27 @@ fastq_input()
     echo "SAM files post-processing..."
     echo ""
 
+    # SOFT-CLIP READS THAT HANG OFF THE ENDS OF THE CHROMOSOME
+    echo "Soft-clipping..."
+    echo ""
+    for i in $(ls -d OUT_*)
+    do
+        cd ${i}
+        java -Xmx${java_mem} -Djava.io.tmpdir=`pwd`/tmp -jar ${externaltoolsfolder}/CleanSam.jar \
+         INPUT=OUT.sam \
+         OUTPUT=OUT.sc.sam
+        mv OUT.sam OUT.bk.sam
+        mv OUT.sc.sam OUT.sam
+        cd ..
+    done
+
+    # SORT SAM WITH PICARD TOOLS
     echo "##### SORTING OUT.sam FILES WITH PICARDTOOLS..."
     echo ""
     for i in $(ls -d OUT_*)
     do
         cd ${i}
-        java -Xmx4g -Djava.io.tmpdir=`pwd`/tmp -jar ${externaltoolsfolder}SortSam.jar \
+        java -Xmx${java_mem} -Djava.io.tmpdir=`pwd`/tmp -jar ${externaltoolsfolder}/SortSam.jar \
          SORT_ORDER=coordinate \
          INPUT=OUT.sam \
          OUTPUT=OUT.sam.bam \
@@ -378,8 +391,6 @@ fastq_input()
     done
 
     check_exit_status
-#### DOING THIS ####
-    # SORT SAM WITH PICARD TOOLS
 
     # INDEXING BAM FILES WITH SAMTOOLS
     for i in $(ls -d OUT_*)
@@ -389,7 +400,6 @@ fastq_input()
         cd ..
     done
     
-#### DOING THIS ####
     # REALIGN KNOWN INDELS WITH GATK
     if $UseIndelRealigner
     then
@@ -398,19 +408,19 @@ fastq_input()
         echo ""
         for i in $(ls -d OUT_*)
         do
-        cd ${i}
-        echo "Realigning known indels for file" ${i}"/OUT.sam.bam using" ${mtoolbox_folder}"data/MITOMAP_HMTDB_known_indels.vcf as reference..."
-        java -Xmx4g -Djava.io.tmpdir=`pwd`/tmp -jar ${externaltoolsfolder}GenomeAnalysisTK.jar \
-         -T IndelRealigner \
-         -R ${mtoolbox_folder}/data/chr${ref}.fa \
-         -I OUT.sam.bam \
-         -o OUT.realigned.bam \
-         -targetIntervals ${mtoolbox_folder}/data/intervals_file_${ref}.list  \
-         -known ${mtoolbox_folder}/data/MITOMAP_HMTDB_known_indels_${ref}.vcf \
-         -compress 0
-        check_exit_status
-        cd ..
-    done
+            cd ${i}
+            echo "Realigning known indels for file" ${i}"/OUT.sam.bam using" ${mtoolbox_folder}"data/MITOMAP_HMTDB_known_indels.vcf as reference..."
+            java -Xmx${javamem} -Djava.io.tmpdir=`pwd`/tmp -jar ${externaltoolsfolder}/GenomeAnalysisTK.jar \
+             -T IndelRealigner \
+             -R ${mtoolbox_folder}/data/chr${ref}.fa \
+             -I OUT.sam.bam \
+             -o OUT.realigned.bam \
+             -targetIntervals ${mtoolbox_folder}/data/intervals_file_${ref}.list  \
+             -known ${mtoolbox_folder}/data/MITOMAP_HMTDB_known_indels_${ref}.vcf \
+             -compress 0
+            check_exit_status
+            cd ..
+        done
     else
         for i in $(ls -d OUT_*)
         do
@@ -429,7 +439,7 @@ fastq_input()
         for i in $(ls -d OUT_*)
         do
             cd ${i}
-            java -Xmx4g -Djava.io.tmpdir=`pwd`/tmp -jar ${externaltoolsfolder}MarkDuplicates.jar \
+            java -Xmx${javamem} -Djava.io.tmpdir=`pwd`/tmp -jar ${externaltoolsfolder}/MarkDuplicates.jar \
              INPUT=OUT.realigned.bam \
              OUTPUT=OUT.sam.bam.marked.bam \
              METRICS_FILE=OUT.sam.bam.metrics.txt \
@@ -447,14 +457,15 @@ fastq_input()
         done
     fi
 
-    # RE-CONVERT BAM OUTPUT FROM MARKDUPLICATES IN SAM.
+    # RE-CONVERT BAM OUTPUT FROM MARKDUPLICATES IN SAM
     for i in $(ls -d OUT_*)
     do
         cd ${i}
-        java -Xmx4g -Djava.io.tmpdir=`pwd`/tmp -jar ${externaltoolsfolder}SamFormatConverter.jar
+        java -Xmx${java_mem} -Djava.io.tmpdir=`pwd`/tmp -jar ${externaltoolsfolder}/SamFormatConverter.jar \
          INPUT=OUT.sam.bam.marked.bam \
          OUTPUT=OUT.sam.bam.marked.bam.marked.sam \
-         TMP_DIR=`pwd`/tmp
+         TMP_DIR=`pwd`/tmp \
+         VALIDATION_STRINGENCY=LENIENT
         cd ..
     done
 
@@ -501,44 +512,73 @@ fasta_input()
         echo "Files to be analyzed:"
         if [[ "${list}" ]]
         then
-            if [ -s list.txt ]
-            #samples in list.txt
+            if $list_is_file # Samples in file list
             then
-                filelist=$(cat list.txt | tr '\n' '\t')
-            else
-            #list of input files defined
-                filelist=$(echo "${list}" | tr ',' '\t')
+                filelist=$(cat ${list} | sed 's/\.fasta//')
+                if [[ ! "${filelist}" ]]
+                then
+                    echo "ERROR: No filenames/IDs found in file \"${list}\" -- Check -l flag."
+                    exit 1
+                fi
+                echo $(echo ${filelist} | wc -w) FASTA filenames/IDs listed from file \"${list}\"
+            else # List of input files as a string in argument
+                filelist=$(echo "${list}" | sed 's/,/\n/' | sed 's/\.fasta//')
+                if [[ ! "$filelist" ]]
+                then
+                    echo "ERROR: No filenames/IDs found in the comma-separated input string -- Check -l flag."
+                    exit 1
+                fi
+                echo $(echo ${filelist} | wc -w) FASTA filenames/IDs form input string \"${list}\"
             fi
         fi    
         
-        
-        if [[ "${output_name}" ]]
-        #output folder defined
+        if [[ "${output_name}" ]] # Output folder defined
         then
             if [[ ! "${list}" ]]
-            #all the input files
+            # No -l flag argument provided, listing FASTA files in input dir
             then
-                for i in $(test_fasta.py); do bname=$(echo ${i} | awk 'BEGIN{FS="."}{print $1}'); bname_dir=OUT_${bname}; mkdir ${output_name}/${bname_dir}; cp ${i} ${output_name}/${bname_dir}/${bname}-contigs.fasta; echo ${bname}; done
-                #for i in $(ls); do bname=$(echo ${i} | awk 'BEGIN{FS="."}{print $1}'); bname_dir=OUT_${bname}; mkdir ${bname_dir}; cp ${i} ${bname_dir}/${bname}-contigs.fasta; done
+                for i in $(test_fasta.py)
+                    do bname=$(echo ${i} | awk 'BEGIN{FS="."}{print $1}')
+                    bname_dir=OUT_${bname}
+                    mkdir ${output_name}/${bname_dir}
+                    cp ${i} ${output_name}/${bname_dir}/${bname}-contigs.fasta
+                    echo ${bname}
+                done
             else
-                for i in $filelist; do bname=$(echo ${i} | awk 'BEGIN{FS="."}{print $1}'); bname_dir=OUT_${bname}; mkdir ${output_name}/${bname_dir}; cp ${i} ${output_name}/${bname_dir}/${bname}-contigs.fasta; echo ${bname}; done
-                #for i in $(ls); do bname=$(echo ${i} | awk 'BEGIN{FS="."}{print $1}'); bname_dir=OUT_${bname}; mkdir ${bname_dir}; cp ${i} ${bname_dir}/${bname}-contigs.fasta; done
+                for i in $filelist
+                do
+                    bname=$(echo ${i} | awk 'BEGIN{FS="."}{print $1}')
+                    bname_dir=OUT_${bname}
+                    mkdir ${output_name}/${bname_dir}
+                    cp ${i} ${output_name}/${bname_dir}/${bname}-contigs.fasta
+                    echo ${bname}
+                done
             fi
-        else
-        #no output folder defined
+        else # No output folder defined
             if [[ ! "${list}" ]]
-            #all the input files
+            # No -l flag argument provided, listing SAM files in input dir
             then
-                for i in $(test_fasta.py); do bname=$(echo ${i} | awk 'BEGIN{FS="."}{print $1}'); bname_dir=OUT_${bname}; mkdir "${bname_dir}"; cp ${i} ${bname_dir}/${bname}-contigs.fasta; echo ${bname}; done
-                #for i in $(ls); do bname=$(echo ${i} | awk 'BEGIN{FS="."}{print $1}'); bname_dir=OUT_${bname}; mkdir ${bname_dir}; cp ${i} ${bname_dir}/${bname}-contigs.fasta; done
-            else
-            #list of input files defined    
-                for i in $filelist; do bname=$(echo ${i} | awk 'BEGIN{FS="."}{print $1}'); bname_dir=OUT_${bname}; mkdir "${bname_dir}"; cp ${i} ${bname_dir}/${bname}-contigs.fasta; echo ${bname}; done
-                #for i in $(ls); do bname=$(echo ${i} | awk 'BEGIN{FS="."}{print $1}'); bname_dir=OUT_${bname}; mkdir ${bname_dir}; cp ${i} ${bname_dir}/${bname}-contigs.fasta; done
+                for i in $(test_fasta.py)
+                do bname=$(echo ${i} | awk 'BEGIN{FS="."}{print $1}')
+                bname_dir=OUT_${bname}
+                mkdir "${bname_dir}"
+                cp ${i} ${bname_dir}/${bname}-contigs.fasta
+                echo ${bname}
+            done
+            else  #list of input files defined    
+                for i in $filelist
+                do
+                    bname=$(echo ${i} | awk 'BEGIN{FS="."}{print $1}')
+                    bname_dir=OUT_${bname}
+                    mkdir "${bname_dir}"
+                    cp ${i} ${bname_dir}/${bname}-contigs.fasta
+                    echo ${bname}
+                done
             fi                
         fi
         check_exit_status
     fi    
+
     echo ""
     echo "##### PREDICTING HAPLOGROUPS AND ANNOTATING/PRIORITIZING VARIANTS..."
     echo ""
@@ -551,14 +591,26 @@ fasta_input()
     hpbest="mt_classification_best_results.csv" # change just this name for changing filename with most reliable haplogroup predictions
     echo "Haplogroup predictions based on RSRS Phylotree build 16"
     echo "SampleID,Best predicted haplogroup(s)" > ${hpbest}
-    for i in $(ls -d OUT_*); do inhandle=$(echo ${i} | sed 's/OUT_//g'); cd ${i}; mt-classifier.py -i ${inhandle}-contigs.fasta -s ${hpbest} -b ${inhandle} -m ${muscleexe} ${mt_classifier_OPTS}; cd ..; done
+    for i in $(ls -d OUT_*)
+    do
+        inhandle=$(echo ${i} | sed 's/OUT_//g')
+        cd ${i}
+        mt-classifier.py -i ${inhandle}-contigs.fasta -s ${hpbest} -b ${inhandle} -m ${muscleexe} ${mt_classifier_OPTS}
+        cd ..
+    done
 
     # Functional annotation of variants
     #for i in $(ls -d OUT_*); do cd $i; variants_functional_annotation.py $hpbest ; cd ..; done
     variants_functional_annotation.py #${hpbest}
     # Collect all prioritized variants from all the samples
-    for i in $(ls -d OUT_*/*annotation.csv); do tail -n+2 $i | awk 'BEGIN {FS="\t"}; {if ($5 == "yes" && $6 == "yes" && $7 == "yes") {print $1"\t"$2"\t"$10"\t"$11"\t"$12"\t"$13"\t"$14"\t"$15"\t"$16"\t"$17"\t"$30"\t"$31"\t"$32"\t"$33"\t"$34"\t"$35"\t"$36"\t"$37"\t"$38"\t"$39"\t"$40"\t"$41"\t"$42"\t"$43"\t"$44}}' >> priority_tmp.txt; done
-    for i in $(ls -d OUT_*/*annotation.csv); do tail -n+2 $i | awk 'BEGIN {FS="\t"}; {if ($5 == "yes" && $6 == "yes" && $7 == "yes") count++} END {print $1"\t"NR"\t"count}' >> variant_number.txt; done
+    for i in $(ls -d OUT_*/*annotation.csv)
+    do
+        tail -n+2 $i | awk 'BEGIN {FS="\t"}; {if ($5 == "yes" && $6 == "yes" && $7 == "yes") {print $1"\t"$2"\t"$10"\t"$11"\t"$12"\t"$13"\t"$14"\t"$15"\t"$16"\t"$17"\t"$30"\t"$31"\t"$32"\t"$33"\t"$34"\t"$35"\t"$36"\t"$37"\t"$38"\t"$39"\t"$40"\t"$41"\t"$42"\t"$43"\t"$44}}' >> priority_tmp.txt
+    done
+    for i in $(ls -d OUT_*/*annotation.csv)
+    do
+        tail -n+2 $i | awk 'BEGIN {FS="\t"}; {if ($5 == "yes" && $6 == "yes" && $7 == "yes") count++} END {print $1"\t"NR"\t"count}' >> variant_number.txt
+    done
     prioritization.py priority_tmp.txt
     rm priority_tmp.txt
     echo ""
@@ -568,7 +620,14 @@ fasta_input()
     then
         summary.py
     else
-        for i in $(ls -d OUT_*); do name=$(echo $i | sed 's/OUT_//g'); cd $i; coverage=$(cat *coverage.txt | grep "Assemble"); cd ..; echo "Sample:" "$name" "$coverage"; done >> coverage_tmp.txt
+        for i in $(ls -d OUT_*)
+        do
+            name=$(echo $i | sed 's/OUT_//g')
+            cd $i
+            coverage=$(cat *coverage.txt | grep "Assemble")
+            cd ..
+            echo "Sample:" "$name" "$coverage"
+        done >> coverage_tmp.txt
         if [[ "${assembleMTgenome_OPTS}" ]]
         then
             HFthreshold=$(echo "$assembleMTgenome_OPTS" | grep -oh "\w*-z[[:space:]][0-9]\.[0-9]\w*" | tr '\ ' '\n' | awk 'NR==2')
@@ -584,9 +643,17 @@ fasta_input()
             HFthreshold=$(echo "0.8")
             REdistance=$(echo "5")
         fi    
-        #if [[ "${assembleMTgenome_OPTS}" ]]
-        #then
-        for i in $(ls -d OUT_*); do name=$(echo $i | sed 's/OUT_//g'); cd $i; heteroplasmy=$(echo "$HFthreshold"); homo_variants=$(awk 'BEGIN {FS="\t"}; {if ($3 == "1.0") count++} END {print count}' *annotation.csv); above_threshold=$(awk -v thrsld=$heteroplasmy 'BEGIN {FS="\t"};{if ( $3 >= thrsld && $3 < "1.0" ) count++} END {print count}' *annotation.csv); under_threshold=$(awk -v thrsld=$heteroplasmy 'BEGIN {FS="\t"};{if ( $3 < thrsld && $3 > "0" ) count++} END {print count}' *annotation.csv); cd ..; echo "$name" "$homo_variants" "$above_threshold" "$under_threshold"; done >> heteroplasmy_count.txt
+        for i in $(ls -d OUT_*)
+        do
+            name=$(echo $i | sed 's/OUT_//g')
+            cd $i
+            heteroplasmy=$(echo "$HFthreshold")
+            homo_variants=$(awk 'BEGIN {FS="\t"}; {if ($3 == "1.0") count++} END {print count}' *annotation.csv)
+            above_threshold=$(awk -v thrsld=$heteroplasmy 'BEGIN {FS="\t"};{if ( $3 >= thrsld && $3 < "1.0" ) count++} END {print count}' *annotation.csv)
+            under_threshold=$(awk -v thrsld=$heteroplasmy 'BEGIN {FS="\t"};{if ( $3 < thrsld && $3 > "0" ) count++} END {print count}' *annotation.csv)
+            cd ..
+            echo "$name" "$homo_variants" "$above_threshold" "$under_threshold"
+        done >> heteroplasmy_count.txt
         #else
         #    for i in $(ls -d OUT_*); do name=$(echo $i | sed 's/OUT_//g'); cd $i; homo_variants=$(awk 'BEGIN {FS="\t"}; {if ($3 == "1.0") count++} END {print count}' *annotation.csv); above_threshold=$(awk 'BEGIN {FS="\t"};{if ( $3 >= "0.8" && $3 < "1.0" ) count++} END {print count}' *annotation.csv); under_threshold=$(awk 'BEGIN {FS="\t"};{if ( $3 < "0.8" && $3 > "0" ) count++} END {print count}' *annotation.csv); cd ..; echo "$name" "$homo_variants" "$above_threshold" "$under_threshold"; done >> heteroplasmy_count.txt
         #fi        
@@ -645,12 +712,12 @@ sam_input()
     for i in ${sam_samples}
     do
         echo "Converting sam to fastq..." ${i}.sam
-        java -Xmx${java_mem} -Djava.io.tmpdir=`pwd`/tmp -jar ${externaltoolsfolder}SamToFastq.jar \
+        java -Xmx${java_mem} -Djava.io.tmpdir=`pwd`/tmp -jar ${externaltoolsfolder}/SamToFastq.jar \
          INPUT=${i}.sam \
          FASTQ=${output_name}/${i}.R1.fastq \
          SECOND_END_FASTQ=${output_name}/${i}.R2.fastq \
          UNPAIRED_FASTQ=${output_name}/${i}.fastq \
-         VALIDATION_STRINGENCY=SILENT \
+         VALIDATION_STRINGENCY=LENIENT \
          TMP_DIR=${output_name}/tmp
         echo "Done."
     done
@@ -709,12 +776,12 @@ bam_input()
         do
             echo "Converting bam to fastq..." ${i}
             n=$(echo $i | awk 'BEGIN{FS="."}{print $1}')
-            java -Xmx${java_mem} -Djava.io.tmpdir=`pwd`/tmp -jar ${externaltoolsfolder}SamToFastq.jar \
+            java -Xmx${java_mem} -Djava.io.tmpdir=`pwd`/tmp -jar ${externaltoolsfolder}/SamToFastq.jar \
              INPUT=${n}.MT.bam \
              FASTQ=${n}.R1.fastq \
              SECOND_END_FASTQ=${n}.R2.fastq \
              UNPAIRED_FASTQ=${n}.fastq \
-             VALIDATION_STRINGENCY=SILENT \
+             VALIDATION_STRINGENCY=LENIENT \
              TMP_DIR=${output_name}/tmp
             echo "Done."
         done
@@ -729,12 +796,12 @@ bam_input()
         for i in ${bam_samples}
         do
             echo "Converting bam to fastq..." ${i}.bam
-            java -Xmx${java_mem} -Djava.io.tmpdir=`pwd`/tmp -jar ${externaltoolsfolder}SamToFastq.jar \
+            java -Xmx${java_mem} -Djava.io.tmpdir=`pwd`/tmp -jar ${externaltoolsfolder}/SamToFastq.jar \
              INPUT=${i}.bam \
              FASTQ=${output_name}/${i}.R1.fastq \
              SECOND_END_FASTQ=${output_name}/${i}.R2.fastq \
              UNPAIRED_FASTQ=${output_name}/${i}.fastq \
-             VALIDATION_STRINGENCY=SILENT \
+             VALIDATION_STRINGENCY=LENIENT \
              TMP_DIR=${output_name}/tmp
             echo "Done."
         done
@@ -768,8 +835,6 @@ then
         in-out_folders
         bam_input
         fastq_input
-        echo "HERE 2"
-        exit 1
         fasta_input
     else
         echo "Input format not recognized."

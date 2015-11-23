@@ -399,7 +399,7 @@ def median(l):
 		if len(l)%2 != 0:
 			median= sorted(l)[((len(l)+1)/2)-1]
 		else:
-			m1 = sorted(l)[(len(l)/2)+1-1]
+			m1 = sorted(l)[(len(l)/2)]
 			m2 = sorted(l)[(len(l)/2)-1]
 			median= (float(m1)+float(m2))/2
 		return median
@@ -538,6 +538,8 @@ def SearchINDELsintoSAM(readNAME,mate,CIGAR,seq,qs,refposleft,tail=5):
 				qsL.append(ord(x)-33)
 			for x in qsRight:
 				qsR.append(ord(x)-33)
+			print 'qs=%s' % qs
+			print 'qsL=%s' % qsL
 			medL=median(qsL)
 			medR=median(qsR)
 			qsDel.append(medL)
