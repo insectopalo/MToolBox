@@ -283,13 +283,15 @@ def data_parsing(file_file, site_file, bestres_file, haptab_file):
 def get_HF(VCF_dict, sampleID, variant_site):
     # variant site is pprint
     HF, CI = ('', '')
+    strHF=''
     try:
         HF, CI_low, CI_up = VCF_dict[sampleID][variant_site]
-        CI = ';'.join(str(item) for item in [CI_low, CI_up])
+        CI = ';'.join('{%.6f}'.format(item) for item in [CI_low, CI_up])
+        strHF = '{%.6f}'.format(HF)
     except:
         #print "sample %s, variant %s not found." % (sampleID, variant_site)
         pass
-    return HF, CI
+    return strHF, CI
 #     main_functional_analysis(merg, d, g, best, haplo, hapconto, PATH, FILENAME, mutations_HF_dict)
 def main_functional_analysis(merg, d, g, best, haplo, hapconto, PATH, FILENAME, mutations_HF_dict, samp):
     ###

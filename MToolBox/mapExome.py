@@ -60,7 +60,7 @@ for o,a in opts:
 	else:
 		assert False, "unhandled option"
 
-print "Input files: %s, %s, %s" % (fastq1, fastq2, fastq3)
+print "  Input files: %s, %s, %s" % (fastq1, fastq2, fastq3)
 
 def rev(seq):
 	d={'A':'T','T':'A','C':'G','G':'C','N':'N'}
@@ -97,8 +97,8 @@ if use_gsnap == False:
 		map1cmd='%s -D %s -d %s -f samse --nofails %s -n 1 -O -t %i %s %s > %s 2> %s' %(gsnapexe,gsnapdb,mtdb,RG_tag,thread,fD[fastq1],fD[fastq2],os.path.join(folder,'outmt.sam'),os.path.join(folder,'logmt.txt'))
 	else:
 		map1cmd='%s -D %s -d %s -f samse --nofails %s -n 1 -O -t %i %s > %s 2> %s' %(gsnapexe,gsnapdb,mtdb,RG_tag,thread,fD[fastq1],os.path.join(folder,'outmt.sam'),os.path.join(folder,'logmt.txt'))
-	print 'Mapping onto mtDNA...'
-	print map1cmd
+	print '  Mapping onto mtDNA...'
+	#print map1cmd
 	os.system(map1cmd)
 	for k in fD.keys(): # remove uncompressed files after alignment
 		if k.endswith(".gz") or k.endswith(".bz") or k.endswith(".bz2"):
@@ -111,13 +111,13 @@ else:
 		map1cmd='%s -D %s -d %s -A sam --nofails --pairmax-dna=500 --query-unk-mismatch=1 %s -n 1 -Q -O -t %i %s %s > %s 2> %s' %(gsnapexe,gsnapdb,mtdb,RG_tag,thread,fastq1,fastq2,os.path.join(folder,'outmt.sam'),os.path.join(folder,'logmt.txt'))
 	else:
 		map1cmd='%s -D %s --gunzip --bunzip2 -d %s -A sam --nofails --pairmax-dna=500 --query-unk-mismatch=1 %s -n 1 -Q -O -t %i %s > %s 2> %s' %(gsnapexe,gsnapdb,mtdb,RG_tag,thread,fastq1,os.path.join(folder,'outmt.sam'),os.path.join(folder,'logmt.txt'))
-	print 'Mapping onto mtDNA...'
-	print map1cmd
+	print '  Mapping onto mtDNA...'
+	#print map1cmd
 	os.system(map1cmd)
 
 #
 
-print 'Extracting FASTQ from SAM...'
+print '  Extracting FASTQ from SAM...'
 mtoutsam=os.path.join(folder,'outmt.sam')
 dics={}
 f=open(mtoutsam)
@@ -169,23 +169,23 @@ if len(pair1)!=0:
 
 
 if sig:
-	print 'Mapping onto complete human genome...single reads'
+	print '  Mapping onto complete human genome... single reads'
 	if use_gsnap == False:
 		map2cmd='%s -D %s -d %s -f samse --nofails -n 1 -O -t %i %s > %s 2> %s' %(gsnapexe,gsnapdb,humandb,thread,mtoutfastq,os.path.join(folder,'outhumanS.sam'),os.path.join(folder,'loghumanS.txt'))
 	else:
 		map2cmd='%s -D %s -d %s -A sam --nofails --query-unk-mismatch=1 -O -t %i %s > %s 2> %s' %(gsnapexe,gsnapdb,humandb,thread,mtoutfastq,os.path.join(folder,'outhumanS.sam'),os.path.join(folder,'loghumanS.txt'))
-	print map2cmd
+	#print map2cmd
 	os.system(map2cmd)
 if pai:
-	print 'Mapping onto complete human genome...pair reads'
+	print '  Mapping onto complete human genome... pair reads'
 	if use_gsnap == False:
 		map3cmd='%s -D %s -d %s -f samse --nofails -n 1 -O -t %i %s %s > %s 2> %s' %(gsnapexe,gsnapdb,humandb,thread,mtoutfastq1,mtoutfastq2,os.path.join(folder,'outhumanP.sam'),os.path.join(folder,'logmt.txt'))
 	else:
 		map3cmd='%s -D %s -d %s -A sam --nofails --query-unk-mismatch=1 -O -t %i %s %s > %s 2> %s' %(gsnapexe,gsnapdb,humandb,thread,mtoutfastq1,mtoutfastq2,os.path.join(folder,'outhumanP.sam'),os.path.join(folder,'loghumanP.txt'))
-	print map3cmd
+	#print map3cmd
 	os.system(map3cmd)
 
-print 'Reading Results...'
+print '  Reading Results...'
 if sig:
 	hgoutsam=os.path.join(folder,'outhumanS.sam')
 	dicsingle={}
@@ -213,7 +213,7 @@ if pai:
 			dicpair[l[0]]=[l]
 	f.close()
 
-print 'Filtering reads...'
+print '  Filtering reads...'
 good=[]
 for i in dics:
 	ll=dics[i]
@@ -272,6 +272,6 @@ out.close()
 	f.close()
 	out.close()
 	"""
-print 'Outfile saved on %s.' %(finalsam)
-print 'Done.'
+print '  Outfile saved on %s.' %(finalsam)
+print 'Success.'
 

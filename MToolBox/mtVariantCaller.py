@@ -1,1003 +1,655 @@
 #!/usr/bin/env python
 
-"""
-Written by Claudia Calabrese - claudia.calabrese23@gmail.com
-	and Domenico Simone - dome.simone@gmail.com
-"""
-
 import sys, os, glob, math
-#print sys.version
 import re
 import ast
 from collections import OrderedDict
 import vcf
 
-# provvisory reference
-RSRS = """
-GATCACAGGTCTATCACCCTATTAACCACTCACGGGAGCTCTCCATGCAT
-	TTGGTATTTTCGTCTGGGGGGTGTGCACGCGATAGCATTGCGAGACGCTG
-	GAGCCGGAGCACCCTATGTCGCAGTATCTGTCTTTGATTCCTGCCCCATC
-	CCATTATTTATCGCACCTACGTTCAATATTACAGGCGAACATACCTACTA
-	AAGTGTGTTAATTAATTAATGCTTGTAGGACATAATAATAACAATTAAAT
-	GTCTGCACAGCCGCTTTCCACACAGACATCATAACAAAAAATTTCCACCA
-	AACCCCCCCTCCCCCGCTTCTGGCCACAGCACTTAAACACATCTCTGCCA
-	AACCCCAAAAACAAAGAACCCTAACACCAGCCTAACCAGATTTCAAATTT
-	TATCTTTTGGCGGTATGCACTTTTAACAGTCACCCCCCAACTAACACATT
-	ATTTTCCCCTCCCACTCCCATACTACTAATCTCATCAATACAACCCCCGC
-	CCATCCTACCCAGCACACACACNNCGCTGCTAACCCCATACCCCGAACCA
-	ACCAAACCCCAAAGACACCCCCCACAGTTTATGTAGCTTACCTCCTCAAA
-	GCAATACACTGAAAATGTTTAGACGGGCTCACATCACCCCATAAACAAAT
-	AGGTTTGGTCCTAGCCTTTCTATTAGCTCTTAGTAAGATTACACATGCAA
-	GCATCCCCGTTCCAGTGAGTTCACCCTCTAAATCACCACGATCAAAAGGG
-	ACAAGCATCAAGCACGCAACAATGCAGCTCAAAACGCTTAGCCTAGCCAC
-	ACCCCCACGGGAAACAGCAGTGATAAACCTTTAGCAATAAACGAAAGTTT
-	AACTAAGCTATACTAACCCCAGGGTTGGTCAATTTCGTGCCAGCCACCGC
-	GGTCACACGATTAACCCAAGTCAATAGAAGCCGGCGTAAAGAGTGTTTTA
-	GATCACCCCCTCCCCAATAAAGCTAAAACTCACCTGAGTTGTAAAAAACT
-	CCAGTTGACACAAAATAAACTACGAAAGTGGCTTTAACATATCTGAACAC
-	ACAATAGCTAAGACCCAAACTGGGATTAGATACCCCACTATGCTTAGCCC
-	TAAACCTCAACAGTTAAATCAACAAAACTGCTCGCCAGAACACTACGAGC
-	CACAGCTTAAAACTCAAAGGACCTGGCGGTGCTTCATATCCCTCTAGAGG
-	AGCCTGTTCTGTAATCGATAAACCCCGATCAACCTCACCACCTCTTGCTC
-	AGCCTATATACCGCCATCTTCAGCAAACCCTGATGAAGGCTACAAAGTAA
-	GCGCAAGTACCCACGTAAAGACGTTAGGTCAAGGTGTAGCCCATGAGGTG
-	GCAAGAAATGGGCTACATTTTCTACCCCAGAAAACTACGATAGCCCTTAT
-	GAAACTTAAGGGTCGAAGGTGGATTTAGCAGTAAACTGAGAGTAGAGTGC
-	TTAGTTGAACAGGGCCCTGAAGCGCGTACACACCGCCCGTCACCCTCCTC
-	AAGTATACTTCAAAGGACATTTAACTAAAACCCCTACGCATTTATATAGA
-	GGAGACAAGTCGTAACATGGTAAGTGTACTGGAAAGTGCACTTGGACGAA
-	CCAGAGTGTAGCTTAACACAAAGCACCCAACTTACACTTAGGAGATTTCA
-	ACTTAACTTGACCGCTCTGAGCTAAACCTAGCCCCAAACCCACTCCACCT
-	TACTACCAGACAACCTTAGCCAAACCATTTACCCAAATAAAGTATAGGCG
-	ATAGAAATTGAAACCTGGCGCAATAGATATAGTACCGCAAGGGAAAGATG
-	AAAAATTATAACCAAGCATAATATAGCAAGGACTAACCCCTATACCTTCT
-	GCATAATGAATTAACTAGAAATAACTTTGCAAGGAGAGCCAAAGCTAAGA
-	CCCCCGAAACCAGACGAGCTACCTAAGAACAGCTAAAAGAGCACACCCGT
-	CTATGTAGCAAAATAGTGGGAAGATTTATAGGTAGAGGCGACAAACCTAC
-	CGAGCCTGGTGATAGCTGGTTGTCCAAGATAGAATCTTAGTTCAACTTTA
-	AATTTGCCCACAGAACCCTCTAAATCCCCTTGTAAATTTAACTGTTAGTC
-	CAAAGAGGAACAGCTCTTTGGACACTAGGAAAAAACCTTGTAGAGAGAGT
-	AAAAAATTTAACACCCATAGTAGGCCTAAAAGCAGCCACCAATTAAGAAA
-	GCGTTCAAGCTCAACACCCACTACCTAAAAAATCCCAAACATATAACTGA
-	ACTCCTCACACCCAATTGGACCAATCTATCACCCTATAGAAGAACTAATG
-	TTAGTATAAGTAACATGAAAACATTCTCCTCCGCATAAGCCTGCGTCAGA
-	TTAAAACACTGAACTGACAATTAACAGCCCAATATCTACAATCAACCAAC
-	AAGTCATTATTACCCTCACTGTCAACCCAACACAGGCATGCTCATAAGGA
-	AAGGTTAAAAAAAGTAAAAGGAACTCGGCAAATCTTACCCCGCCTGTTTA
-	CCAAAAACATCACCTCTAGCATCACCAGTATTAGAGGCACCGCCTGCCCA
-	GTGACACATGTTTAACGGCCGCGGTACCCTAACCGTGCAAAGGTAGCATA
-	ATCACTTGTTCCTTAAATAGGGACCTGTATGAATGGCTCCACGAGGGTTC
-	AGCTGTCTCTTACTTTTAACCAGTGAAATTGACCTGCCCGTGAAGAGGCG
-	GGCATGACACAGCAAGACGAGAAGACCCTATGGAGCTTTAATTTATTAAT
-	GCAAACAATACCTAACAAACCCACAGGTCCTAAACTACCAAACCTGCATT
-	AAAAATTTCGGTTGGGGCGACCTCGGAGCAGAACCCAACCTCCGAGCAGT
-	ACATGCTAAGACTTCACCAGTCAAAGCGAACTACCATACTCAATTGATCC
-	AATAACTTGACCAACGGAACAAGTTACCCTAGGGATAACAGCGCAATCCT
-	ATTCTAGAGTCCATATCAACAATAGGGTTTACGACCTCGATGTTGGATCA
-	GGACATCCCGATGGTGCAGCCGCTATTAAAGGTTCGTTTGTTCAACGATT
-	AAAGTCCTACGTGATCTGAGTTCAGACCGGAGTAATCCAGGTCGGTTTCT
-	ATCTACNTTCAAATTCCTCCCTGTACGAAAGGACAAGAGAAATAAGGCCT
-	ACTTCACAAAGCGCCTTCCCCCGTAAATGATATCATCTCAACTTAGTATT
-	ATACCCACACCCACCCAAGAACAGGGTTTGTTAAGATGGCAGAGCCCGGT
-	AATCGCATAAAACTTAAAACTTTACAGTCAGAGGTTCAATTCCTCTTCTT
-	AACAACATACCCATGGCCAACCTCCTACTCCTCATTGTACCCATTCTAAT
-	CGCAATGGCATTCCTAATGCTTACCGAACGAAAAATTCTAGGCTATATAC
-	AACTACGCAAAGGCCCCAACGTTGTAGGCCCCTACGGGCTACTACAACCC
-	TTCGCTGACGCCATAAAACTCTTCACCAAAGAGCCCCTAAAACCCGCCAC
-	ATCTACCATCACCCTCTACATCACCGCCCCGACCTTAGCTCTCACCATCG
-	CTCTTCTACTATGAACCCCCCTCCCCATACCCAACCCCCTGGTTAACCTC
-	AACCTAGGCCTCCTATTTATTCTAGCCACCTCTAGCCTAGCCGTTTACTC
-	AATCCTCTGATCAGGGTGAGCATCAAACTCAAACTACGCCCTGATCGGCG
-	CACTGCGAGCAGTAGCCCAAACAATCTCATATGAAGTCACCCTAGCCATC
-	ATTCTACTATCAACATTACTAATAAGTGGCTCCTTTAACCTCTCCACCCT
-	TATCACAACACAAGAACACCTCTGATTACTCCTGCCATCATGACCCTTGG
-	CCATAATATGATTTATCTCCACACTAGCAGAGACCAACCGAACCCCCTTC
-	GACCTTGCCGAAGGGGAGTCCGAACTAGTCTCAGGCTTCAACATCGAATA
-	CGCCGCAGGCCCCTTCGCCCTATTCTTCATAGCCGAATACACAAACATTA
-	TTATAATAAACACCCTCACCACTACAATCTTCCTAGGAACAACATATGAC
-	GCACTCTCCCCTGAACTCTACACAACATATTTTGTCACCAAGACCCTACT
-	TCTGACCTCCCTGTTCTTATGAATTCGAACAGCATACCCCCGATTCCGCT
-	ACGACCAACTCATACACCTCCTATGAAAAAACTTCCTACCACTCACCCTA
-	GCATTACTTATATGATATGTCTCCATACCCATTACAATCTCCAGCATTCC
-	CCCTCAAACCTAAGAAATATGTCTGATAAAAGAGTTACTTTGATAGAGTA
-	AATAATAGGAGTTTAAACCCCCTTATTTCTAGGACTATGAGAATCGAACC
-	CATCCCTGAGAATCCAAAATTCTCCGTGCCACCTATCACACCCCATCCTA
-	AAGTAAGGTCAGCTAAATAAGCTATCGGGCCCATACCCCGAAAATGTTGG
-	TTATACCCTTCCCGTACTAATTAATCCCCTGGCCCAACCCGTCATCTACT
-	CTACCATCTTTGCAGGCACACTCATCACAGCGCTAAGCTCGCACTGATTT
-	TTTACCTGAGTAGGCCTAGAAATAAACATGCTAGCTTTTATTCCAGTTCT
-	AACCAAAAAAATAAACCCTCGTTCCACAGAAGCTGCCATCAAGTATTTCC
-	TCACGCAAGCAACCGCATCCATAATCCTTCTAATAGCTATCCTCTTCAAC
-	AATATACTCTCCGGACAATGAACCATAACCAATACTACCAATCAATACTC
-	ATCATTAATAATCATAATGGCTATAGCAATAAAACTAGGAATAGCCCCCT
-	TTCACTTCTGAGTCCCAGAGGTTACCCAAGGCACCCCTCTGACATCCGGC
-	CTGCTTCTTCTCACATGACAAAAACTAGCCCCCATCTCAATCATATACCA
-	AATCTCTCCCTCACTAAACGTAAGCCTTCTCCTCACTCTCTCAATCTTAT
-	CCATCATAGCAGGCAGTTGAGGTGGATTAAACCAAACCCAGCTACGCAAA
-	ATCTTAGCATACTCCTCAATTACCCACATAGGATGAATAATAGCAGTTCT
-	ACCGTACAACCCTAACATAACCATTCTTAATTTAACTATTTATATTATCC
-	TAACTACTACCGCATTCCTACTACTCAACTTAAACTCCAGCACCACGACC
-	CTACTACTATCTCGCACCTGAAACAAGCTAACATGACTAACACCCTTAAT
-	TCCATCCACCCTCCTCTCCCTAGGAGGCCTGCCCCCGCTAACCGGCTTTT
-	TGCCCAAATGGGCCATTATCGAAGAATTCACAAAAAACAATAGCCTCATC
-	ATCCCCACCATCATAGCCACCATCACCCTCCTTAACCTCTACTTCTACCT
-	ACGCCTAATCTACTCCACCTCAATCACACTACTCCCCATATCTAACAACG
-	TAAAAATAAAATGACAGTTTGAACATACAAAACCCACCCCATTCCTCCCC
-	ACACTCATCGCCCTTACCACGCTACTCCTACCTATCTCCCCTTTTATACT
-	AATAATCTTATAGAAATTTAGGTTAAATACAGACCAAGAGCCTTCAAAGC
-	CCTCAGTAAGTTGCAATACTTAATTTCTGTAACAGCTAAGGACTGCAAAA
-	CCCCACTCTGCATCAACTGAACGCAAATCAGCCACTTTAATTAAGCTAAG
-	CCCTTACTAGACCAATGGGACTTAAACCCACAAACACTTAGTTAACAGCT
-	AAGCACCCTAATCAACTGGCTTCAATCTACTTCTCCCGCCGCCGGGAAAA
-	AAGGCGGGAGAAGCCCCGGCAGGTTTGAAGCTGCTTCTTCGAATTTGCAA
-	TTCAATATGAAAATCACCTCGGAGCTGGTAAAAAGAGGCCTAACCCCTGT
-	CTTTAGATTTACAGTCCAATGCTTCACTCAGCCATTTTACCTCACCCCCA
-	CTGATGTTCGCCGACCGTTGACTATTCTCTACAAACCACAAAGACATTGG
-	AACACTATACCTATTATTCGGCGCATGAGCTGGAGTCCTAGGCACAGCTC
-	TAAGCCTCCTTATTCGAGCCGAGCTGGGCCAGCCAGGCAACCTTCTAGGT
-	AACGACCACATCTACAACGTTATCGTCACAGCCCATGCATTTGTAATAAT
-	CTTCTTCATAGTAATACCCATCATAATCGGAGGCTTTGGCAACTGACTAG
-	TTCCCCTAATAATCGGTGCCCCCGATATGGCGTTTCCCCGCATAAACAAC
-	ATAAGCTTCTGACTCTTACCTCCCTCTCTCCTACTCCTGCTCGCATCTGC
-	TATAGTGGAGGCCGGAGCAGGAACAGGTTGAACAGTCTACCCTCCCTTAG
-	CAGGGAACTACTCCCACCCTGGAGCCTCCGTAGACCTAACCATCTTCTCC
-	TTACACCTAGCAGGTGTCTCCTCTATCTTAGGGGCCATCAATTTCATCAC
-	AACAATTATCAATATAAAACCCCCTGCCATAACCCAATACCAAACGCCCC
-	TCTTCGTCTGATCCGTCCTAATCACAGCAGTCCTACTTCTCCTATCTCTC
-	CCAGTCCTAGCTGCTGGCATCACTATACTACTAACAGACCGCAACCTCAA
-	CACCACCTTCTTCGACCCCGCCGGAGGAGGAGACCCCATTCTATACCAAC
-	ACCTATTCTGATTTTTCGGTCACCCTGAAGTTTATATTCTTATCCTACCA
-	GGCTTCGGAATAATCTCCCATATTGTAACTTACTACTCCGGAAAAAAAGA
-	ACCATTTGGATACATAGGTATGGTCTGAGCTATGATATCAATTGGCTTCC
-	TAGGGTTTATCGTGTGAGCACACCATATATTTACAGTAGGAATAGACGTA
-	GACACACGAGCATATTTCACCTCCGCTACCATAATCATCGCTATCCCCAC
-	CGGCGTCAAAGTATTTAGCTGACTCGCCACACTCCACGGAAGCAATATGA
-	AATGATCTGCTGCAGTGCTCTGAGCCCTAGGATTCATCTTTCTTTTCACC
-	GTAGGTGGCCTGACTGGCATTGTATTAGCAAACTCATCACTAGACATCGT
-	ACTACACGACACGTACTACGTTGTAGCTCACTTCCACTATGTCCTATCAA
-	TAGGAGCTGTATTTGCCATCATAGGAGGCTTCATTCACTGATTTCCCCTA
-	TTCTCAGGCTACACCCTAGACCAAACCTACGCCAAAATCCATTTCGCTAT
-	CATATTCATCGGCGTAAATCTAACTTTCTTCCCACAACACTTTCTCGGCC
-	TATCCGGAATGCCCCGACGTTACTCGGACTACCCCGATGCATACACCACA
-	TGAAATATCCTATCATCTGTAGGCTCATTCATTTCTCTAACAGCAGTAAT
-	ATTAATAATTTTCATGATTTGAGAAGCCTTCGCTTCGAAGCGAAAAGTCC
-	TAATAGTAGAAGAACCCTCCATAAACCTGGAGTGACTATATGGATGCCCC
-	CCACCCTACCACACATTCGAAGAACCCGTATACATAAAATCTAGACAAAA
-	AAGGAAGGAATCGAACCCCCCAAAGCTGGTTTCAAGCCAACCCCATGGCC
-	TCCATGACTTTTTCAAAAAGATATTAGAAAAACCATTTCATAACTTTGTC
-	AAAGTTAAATTATAGGCTAAATCCTATATATCTTAATGGCACATGCAGCG
-	CAAGTAGGTCTACAAGACGCTACTTCCCCTATCATAGAAGAGCTTATCAC
-	CTTTCATGATCACGCCCTCATAATCATTTTCCTTATCTGCTTCCTAGTCC
-	TGTATGCCCTTTTCCTAACACTCACAACAAAACTAACTAATACTAACATC
-	TCAGACGCTCAGGAAATAGAAACCGTCTGAACTATCCTGCCCGCCATCAT
-	CCTAGTCCTCATCGCCCTCCCATCCCTACGCATCCTTTACATAACAGACG
-	AGGTCAACGATCCCTCCCTTACCATCAAATCAATTGGCCACCAATGGTAC
-	TGAACCTACGAGTACACCGACTACGGCGGACTAATCTTCAACTCCTACAT
-	ACTTCCCCCATTATTCCTAGAACCAGGCGACCTGCGACTCCTTGACGTTG
-	ACAATCGAGTAGTACTCCCGATTGAAGCCCCCATTCGTATAATAATTACA
-	TCACAAGACGTCTTGCACTCATGAGCTGTCCCCACATTAGGCTTAAAAAC
-	AGATGCAATTCCCGGACGTCTAAACCAAACCACTTTCACCGCTACACGAC
-	CGGGGGTATACTACGGTCAATGCTCTGAAATCTGTGGAGCAAACCACAGT
-	TTCATGCCCATCGTCCTAGAATTAATTCCCCTAAAAATCTTTGAAATAGG
-	GCCCGTATTTACCCTATAGCACCCCCTCTACCCCCTCTAGAGCCCACTGT
-	AAAGCTAACTTAGCATTAACCTTTTAAGTTAAAGATTAAGAGAACCAACA
-	CCTCTTTACAGTGAAATGCCCCAACTAAATACTACCGTATGGCCCACCAT
-	AATTACCCCCATACTCCTTACACTATTCCTCATCACCCAACTAAAAATAT
-	TAAACACAAACTACCACTTACCTCCCTCACCAAAGCCCATAAAAATAAAA
-	AATTATAACAAACCCTGAGAACCAAAATGAACGAAAATCTGTTCGCTTCA
-	TTCATTGCCCCCACAATCCTAGGCCTACCCGCCGCAGTACTGATCATTCT
-	ATTTCCCCCTCTATTGATCCCCACCTCCAAATATCTCATCAACAACCGAC
-	TAATTACCACCCAACAATGACTAATCAAACTAACCTCAAAACAAATGATA
-	GCCATACACAACACTAAAGGACGAACCTGATCTCTTATACTAGTATCCTT
-	AATCATTTTTATTGCCACAACTAACCTCCTCGGACTCCTGCCTCACTCAT
-	TTACACCAACCACCCAACTATCTATAAACCTAGCCATGGCCATCCCCTTA
-	TGAGCGGGCGCAGTGATTATAGGCTTTCGCTCTAAGATTAAAAATGCCCT
-	AGCCCACTTCTTACCACAAGGCACACCTACACCCCTTATCCCCATACTAG
-	TTATTATCGAAACCATCAGCCTACTCATTCAACCAATAGCCCTGGCCGTA
-	CGCCTAACCGCTAACATTACTGCAGGCCACCTACTCATGCACCTAATTGG
-	AAGCGCCACCCTAGCAATATCAACCATTAACCTTCCCTCTACACTTATCA
-	TCTTCACAATTCTAATTCTACTGACTATCCTAGAAATCGCTGTCGCCTTA
-	ATCCAAGCCTACGTTTTCACACTTCTAGTAAGCCTCTACCTGCACGACAA
-	CACATAATGACCCACCAATCACATGCCTATCATATAGTAAAACCCAGCCC
-	ATGACCCCTAACAGGGGCCCTCTCAGCCCTCCTAATGACCTCCGGCCTAG
-	CCATGTGATTTCACTTCCACTCCATAACGCTCCTCATACTAGGCCTACTA
-	ACCAACACACTAACCATATACCAATGATGGCGCGATGTAACACGAGAAAG
-	CACATACCAAGGCCACCACACACCACCTGTCCAAAAAGGCCTTCGATACG
-	GGATAATCCTATTTATTACCTCAGAAGTTTTTTTCTTCGCAGGATTTTTC
-	TGAGCCTTTTACCACTCCAGCCTAGCCCCTACCCCCCAACTAGGAGGGCA
-	CTGGCCCCCAACAGGCATCACCCCGCTAAATCCCCTAGAAGTCCCACTCC
-	TAAACACATCCGTATTACTCGCATCAGGAGTATCAATCACCTGAGCTCAC
-	CATAGTCTAATAGAAAACAACCGAAACCAAATAATTCAAGCACTGCTTAT
-	TACAATTTTACTGGGTCTCTATTTTACCCTCCTACAAGCCTCAGAGTACT
-	TCGAGTCTCCCTTCACCATTTCCGACGGCATCTACGGCTCAACATTTTTT
-	GTAGCCACAGGCTTCCACGGACTTCACGTCATTATTGGCTCAACTTTCCT
-	CACTATCTGCTTCATCCGCCAACTAATATTTCACTTTACATCCAAACATC
-	ACTTTGGCTTCGAAGCCGCCGCCTGATACTGGCATTTTGTAGATGTGGTT
-	TGACTATTTCTGTATGTCTCCATCTATTGATGAGGGTCTTACTCTTTTAG
-	TATAAATAGTACCGTTAACTTCCAATTAACTAGTTTTGACAACATTCAAA
-	AAAGAGTAATAAACTTCGCCTTAATTTTAATAATCAACACCCTCCTAGCC
-	TTACTACTAATAATTATTACATTTTGACTACCACAACTCAACGGCTACAT
-	AGAAAAATCCACCCCTTACGAGTGCGGCTTCGACCCTATATCCCCCGCCC
-	GCGTCCCTTTCTCCATAAAATTCTTCTTAGTAGCTATTACCTTCTTATTA
-	TTTGATCTAGAAATTGCCCTCCTTTTACCCCTACCATGAGCCCTACAAAC
-	AACTAACCTGCCACTAATAGTTATGTCATCCCTCTTATTAATCATCATCC
-	TAGCCCTAAGTCTGGCCTATGAGTGACTACAAAAAGGATTAGACTGAGCC
-	GAATTGGTATATAGTTTAAACAAAACGAATGATTTCGACTCATTAAATTA
-	TGATAATCATATTTACCAAATGCCCCTCATTTACATAAATATTATACTAG
-	CATTTACCATCTCACTTCTAGGAATACTAGTATATCGCTCACACCTCATA
-	TCCTCCCTACTATGCCTAGAAGGAATAATACTATCGCTGTTCATTATAGC
-	TACTCTCATAACCCTCAACACCCACTCCCTCTTAGCCAATATTGTGCCTA
-	TTGCCATACTAGTTTTTGCCGCCTGCGAAGCAGCGGTAGGCCTAGCCCTA
-	CTAGTCTCAATCTCCAACACATATGGCCTAGACTACGTACATAACCTAAA
-	CCTACTCCAATGCTAAAACTAATCGTCCCAACAATTATATTACTACCACT
-	GACATGACTCTCCAAAAAACACATAATTTGAATCAACACAACCACCCACA
-	GCCTAATTATTAGCATCATCCCCCTACTATTTTTTAACCAAATCAACAAC
-	AACCTATTTAGCTGCTCCCCAACCTTTTCCTCCGACCCCCTAACAACCCC
-	CCTCCTAATACTAACTACCTGACTCCTACCCCTCACAATCATGGCAAGCC
-	AACGCCACTTATCCAGTGAACCACTATCACGAAAAAAACTCTACCTCTCT
-	ATACTAATCTCCCTACAAATCTCCTTAATTATAACATTCACAGCCACAGA
-	ACTAATCATATTTTATATCTTCTTCGAAACCACACTTATCCCCACCTTGG
-	CTATCATCACCCGATGAGGCAACCAGCCAGAACGCCTGAACGCAGGCACA
-	TACTTCCTATTCTACACCCTAGTAGGCTCCCTTCCCCTACTCATCGCACT
-	AATTTACACTCACAACACCCTAGGCTCACTAAACATTCTACTACTCACTC
-	TCACTGCCCAAGAACTATCAAACTCCTGAGCCAACAACTTAATATGACTA
-	GCTTACACAATAGCTTTTATAGTAAAGATACCTCTTTACGGACTCCACTT
-	ATGACTCCCTAAAGCCCATGTCGAAGCCCCCATCGCTGGGTCAATAGTAC
-	TTGCCGCAGTACTCTTAAAACTAGGCGGCTATGGTATAATACGCCTCACA
-	CTCATTCTCAACCCCCTGACAAAACACATAGCCTACCCCTTCCTTGTACT
-	ATCCCTATGAGGCATAATTATAACAAGCTCCATCTGCCTACGACAAACAG
-	ACCTAAAATCGCTCATTGCATACTCTTCAATCAGCCACATAGCCCTCGTA
-	GTAACAGCCATTCTCATCCAAACCCCCTGAAGCTTCACCGGCGCAGTCAT
-	TCTCATAATCGCCCACGGACTTACATCCTCATTACTATTCTGCCTAGCAA
-	ACTCAAACTACGAACGCACTCACAGTCGCATCATAATCCTCTCTCAAGGA
-	CTTCAAACTCTACTCCCACTAATAGCTTTTTGATGACTTCTAGCAAGCCT
-	CGCTAACCTCGCCTTACCCCCCACTATTAACCTACTGGGAGAACTCTCTG
-	TGCTAGTAACCACATTCTCCTGATCAAATATCACTCTCCTACTTACAGGA
-	CTCAACATACTAGTCACAGCCCTATACTCCCTCTACATATTTACCACAAC
-	ACAATGGGGCTCACTCACCCACCACATTAACAACATAAAACCCTCATTCA
-	CACGAGAAAACACCCTCATGTTCATACACCTATCCCCCATTCTCCTCCTA
-	TCCCTCAACCCCGACATCATTACCGGGTTTTCCTCTTGTAAATATAGTTT
-	AACCAAAACATCAGATTGTGAATCTGACAACAGAGGCTTACGACCCCTTA
-	TTTACCGAGAAAGCTCACAAGAACTGCTAACTCATGCCCCCATGTCTAAC
-	AACATGGCTTTCTCAACTTTTAAAGGATAACAGCTATCCATTGGTCTTAG
-	GCCCCAAAAATTTTGGTGCAACTCCAAATAAAAGTAATAACCATGCACAC
-	TACTATAACCACCCTAACCCTGACTTCCCTAATTCCCCCCATCCTTACCA
-	CCCTCGTTAACCCTAACAAAAAAAACTCATACCCCCATTATGTAAAATCC
-	ATTGTCGCATCCACCTTTATTATCAGTCTCTTCCCCACAACAATATTCAT
-	GTGCCTAGACCAAGAAGTTATTATCTCGAACTGACACTGAGCCACAACCC
-	AAACAACCCAGCTCTCCCTAAGCTTCAAACTAGACTACTTCTCCATAATA
-	TTCATCCCTGTAGCATTGTTCGTTACATGGTCCATCATAGAATTCTCACT
-	GTGATATATAAACTCAGACCCAAACATTAATCAGTTCTTCAAATATCTAC
-	TCATTTTCCTAATTACCATACTAATCTTAGTTACCGCTAACAACCTATTC
-	CAACTGTTCATCGGCTGAGAGGGCGTAGGAATTATATCCTTCTTGCTCAT
-	CAGTTGATGATACGCCCGAGCAGATGCCAACACAGCAGCCATTCAAGCAA
-	TCCTATACAACCGTATCGGCGATATCGGTTTCATCCTCGCCTTAGCATGA
-	TTTATCCTACACTCCAACTCATGAGACCCACAACAAATAGCCCTTCTAAA
-	CGCTAATCCAAGCCTCACCCCACTACTAGGCCTCCTCCTAGCAGCAGCAG
-	GCAAATCAGCCCAATTAGGTCTCCACCCCTGACTCCCCTCAGCCATAGAA
-	GGCCCCACCCCAGTCTCAGCCCTACTCCACTCAAGCACTATAGTTGTAGC
-	AGGAGTCTTCTTACTCATCCGCTTCCACCCCCTAGCAGAAAATAGCCCAC
-	TAATCCAAACTCTAACACTATGCTTAGGCGCTATCACCACTCTGTTCGCA
-	GCAGTCTGCGCCCTTACACAAAATGACATCAAAAAAATCGTAGCCTTCTC
-	CACTTCAAGTCAACTAGGACTCATAGTAGTTACAATCGGCATCAACCAAC
-	CACACCTAGCATTCCTGCACATCTGTACCCACGCCTTCTTCAAAGCCATA
-	CTATTTATGTGCTCCGGGTCCATCATCCACAACCTTAACAATGAACAAGA
-	TATTCGAAAAATAGGAGGACTACTCAAAACCATACCTCTCACTTCAACCT
-	CCCTCACCATTGGCAGCCTAGCATTAGCAGGAATACCTTTCCTCACAGGT
-	TTCTATTCCAAAGACCACATCATCGAAACCGCAAACATATCATACACAAA
-	CGCCTGAGCCCTATCTATTACTCTCATCGCTACCTCCCTGACAAGCGCCT
-	ATAGCACTCGAATAATTCTTCTCACCCTAACAGGTCAACCTCGCTTCCCT
-	ACCCTTACTAACATTAACGAAAATAACCCCACCCTACTAAACCCCATTAA
-	ACGCCTGGCAGCCGGAAGCCTATTCGCAGGATTTCTCATTACTAACAACA
-	TTTCCCCCGCATCCCCCTTCCAAACAACAATCCCCCTCTACCTAAAACTC
-	ACAGCCCTCGCTGTCACTTTCCTAGGACTTCTAACAGCCCTAGACCTCAA
-	CTACCTAACCAACAAACTTAAAATAAAATCCCCACTATGCACATTTTATT
-	TCTCCAACATACTCGGATTCTACCCTAGCATCACACACCGCACAATCCCC
-	TATCTAGGCCTTCTTACGAGCCAAAACCTGCCCCTACTCCTCCTAGACCT
-	AACCTGACTAGAAAAGCTATTACCTAAAACAATTTCACAGCACCAAATCT
-	CCACCTCCATCATCACCTCAACCCAAAAAGGCATAATTAAACTTTACTTC
-	CTCTCTTTCTTCTTCCCACTCATCCTAACCCTACTCCTAATCACATAACC
-	TATTCCCCCGAGCAATCTCAATTACAATATATACACCAACAAACAATGTT
-	CAACCAGTAACTACTACTAATCAACGCCCATAATCATACAAAGCCCCCGC
-	ACCAATAGGATCCTCCCGAATCAACCCTGACCCCTCTCCTTCATAAATTA
-	TTCAGCTTCCTACACTATTAAAGTTTACCACAACCACCACCCCATCATAC
-	TCTTTCACCCACAGCACCAATCCTACCTCCATCGCTAACCCCACTAAAAC
-	ACTCACCAAGACCTCAACCCCTGACCCCCATGCCTCAGGATACTCCTCAA
-	TAGCCATCGCTGTAGTATATCCAAAGACAACCATCATTCCCCCTAAATAA
-	ATTAAAAAAACTATTAAACCCATATAACCTCCCCCAAAATTCAGAATAAT
-	AACACACCCGACCACACCGCTAACAATCAATACTAAACCCCCATAAATAG
-	GAGAAGGCTTAGAAGAAAACCCCACAAACCCCATTACTAAACCCACACTC
-	AACAGAAACAAAGCATACATCATTATTCTCGCACGGACTACAACCACGAC
-	CAATGATATGAAAAACCATCGTTGTATTTCAACTACAAGAACACCAATGA
-	CCCCAATACGCAAAATTAACCCCCTAATAAAATTAATTAACCACTCATTC
-	ATCGACCTCCCCACCCCATCCAACATCTCCGCATGATGAAACTTCGGCTC
-	ACTCCTTGGCGCCTGCCTGATCCTCCAAATCACCACAGGACTATTCCTAG
-	CCATGCACTACTCACCAGACGCCTCAACCGCCTTTTCATCAATCGCCCAC
-	ATCACTCGAGACGTAAATTATGGCTGAATCATCCGCTACCTTCACGCCAA
-	TGGCGCCTCAATATTCTTTATCTGCCTCTTCCTACACATCGGGCGAGGCC
-	TATATTACGGATCATTTCTCTACTCAGAAACCTGAAACATCGGCATTATC
-	CTCCTGCTTGCAACTATAGCAACAGCCTTCATAGGCTATGTCCTCCCGTG
-	AGGCCAAATATCATTCTGAGGGGCCACAGTAATTACAAACTTACTATCCG
-	CCATCCCATACATTGGGACAGACCTAGTTCAATGAATCTGAGGAGGCTAC
-	TCAGTAGACAGTCCCACCCTCACACGATTCTTTACCTTTCACTTCATCTT
-	GCCCTTCATTATTGCAGCCCTAGCAGCACTCCACCTCCTATTCTTGCACG
-	AAACGGGATCAAACAACCCCCTAGGAATCACCTCCCATTCCGATAAAATC
-	ACCTTCCACCCTTACTACACAATCAAAGACGCCCTCGGCTTACTTCTCTT
-	CCTTCTCTCCTTAATGACATTAACACTATTCTCACCAGACCTCCTAGGCG
-	ACCCAGACAATTATACCCTAGCCAACCCCTTAAACACCCCTCCCCACATC
-	AAGCCCGAATGATATTTCCTATTCGCCTACACAATTCTCCGATCCGTCCC
-	TAACAAACTAGGAGGCGTCCTTGCCCTATTACTATCCATCCTCATCCTAG
-	CAATAATCCCCATCCTCCATATATCCAAACAACAAAGCATAATATTTCGC
-	CCACTAAGCCAATCACTTTATTGACTCCTAGCCGCAGACCTCCTCATTCT
-	AACCTGAATCGGAGGACAACCAGTAAGCTACCCTTTTACCATCATTGGAC
-	AAGTAGCATCCGTACTATACTTCACAACAATCCTAATCCTAATACCAACT
-	ATCTCCCTAATTGAAAACAAAATACTCAAATGGGCCTGTCCTTGTAGTAT
-	AAACTAATACACCAGTCTTGTAAACCGGAGATGAAAACCTTTTTCCAAGG
-	ACAAATCAGAGAAAAAGTCTTTAACTCCACCATTAGCACCCAAAGCTAAG
-	ATTCTAATTTAAACTATTCTCTGTTCTTTCATGGGGAAGCAGATTTGGGT
-	ACCACCCAAGTATTGACTCACCCATCAACAACCGCTATGTATTTCGTACA
-	TTACTGCCAGCCACCATGAATATTGTACAGTACCATAAATACTTGACCAC
-	CTGTAGTACATAAAAACCCAATCCACATCAAAACCCTCCCCCCATGCTTA
-	CAAGCAAGTACAGCAATCAACCTTCAACTGTCACACATCAACTGCAACTC
-	CAAAGCCACCCCTCACCCACTAGGATATCAACAAACCTACCCACCCTTAA
-	CAGTACATAGCACATAAAGCCATTTACCGTACATAGCACATTACAGTCAA
-	ATCCCTTCTCGTCCCCATGGATGACCCCCCTCAGATAGGGGTCCCTTGAC
-	CACCATCCTCCGTGAAATCAATATCCCGCACAAGAGTGCTACTCTCCTCG
-	CTCCGGGCCCATAACACTTGGGGGTAGCTAAAGTGAACTGTATCCGACAT
-	CTGGTTCCTACTTCAGGGCCATAAAGCCTAAATAGCCCACACGTTCCCCT
-	TAAATAAGACATCACGATG
-	""".replace('\n', '').replace('\r', '').upper()
-	
-RSRS=RSRS.replace('\t','')
-#######################################################
-
 #defines global variables for Indels
 def varnames(i):
-	#global CIGAR, readNAME, seq, qs, refposleft, mate, refposright
-	CIGAR=i[3]
-	readNAME=i[0]
-	seq=i[7]
-	qs=i[8]
-	refposleft=int(i[2])-1
-	mate=int(i[6])
-	return CIGAR, readNAME, seq, qs, refposleft, mate#, refposright
+    CIGAR=i[3]
+    readNAME=i[0]
+    seq=i[7]
+    qs=i[8]
+    refposleft=int(i[2])-1
+    mate=int(i[6])
+    return CIGAR, readNAME, seq, qs, refposleft, mate#, refposright
 
 #defines global variables for MT-table parsing
 def varnames2(b,i):
-	#global Position, Ref, Cons, Cov, A,C,G,T
-	global Position, Ref, Cov, A,C,G,T
-	Position=int((i[0]).strip())
-	Ref=(i[1]).strip()
-	Cov=int((i[3]).strip())
-	A=b[0]
-	C=b[1]
-	G=b[2]
-	T=b[3]
-	return Position, Ref, Cov, A,C,G,T
+    global Position, Ref, Cov, A,C,G,T
+    Position=int((i[0]).strip())
+    Ref=(i[1]).strip()
+    Cov=int((i[3]).strip())
+    A=b[0]
+    C=b[1]
+    G=b[2]
+    T=b[3]
+    return Position, Ref, Cov, A,C,G,T
 #Heteroplasmic fraction quantification
 def heteroplasmy(cov, Covbase):
-	try:
-		if Covbase >= cov: 
-			Heteroplasmy=float(cov)/float(Covbase)
-			het=round(Heteroplasmy, 3)
-			return het
-		else:
-			return 1.0
-	except ZeroDivisionError:
-		het=1.0
-		return het
+    try:
+        if Covbase >= cov: 
+            Heteroplasmy=float(cov)/float(Covbase)
+            het=round(Heteroplasmy, 6)
+            return het
+        else:
+            return 1.0
+    except ZeroDivisionError:
+        het=1.0
+        return het
 #defines mathematical operations
 #sum
 def sum(left):
-	s=0
-	for i in left:
-		s+=int(i)
-	return s
+    s=0
+    for i in left:
+        s+=int(i)
+    return s
 #median
 def median(l):
-	try:
-		if len(l)%2 != 0:
-			median= sorted(l)[((len(l)+1)/2)-1]
-		else:
-			m1 = sorted(l)[(len(l)/2)]
-			m2 = sorted(l)[(len(l)/2)-1]
-			median= (float(m1)+float(m2))/2
-		return median
-	except ZeroDivisionError:
-		return 0
+    try:
+        if len(l)%2 != 0:
+            median= sorted(l)[((len(l)+1)/2)-1]
+        else:
+            m1 = sorted(l)[(len(l)/2)]
+            m2 = sorted(l)[(len(l)/2)-1]
+            median= (float(m1)+float(m2))/2
+        return median
+    except ZeroDivisionError:
+        return 0
 #mean
 def mean(list):
-	try:
-		s=sum(list)
-		m=float(s)/float(len(list))
-		return m
-	except ZeroDivisionError:
-		m=0
-		return m
-#defines function for value errors
-def error(list):
-	try:
-		list.remove('')
-	except ValueError:
-		pass
-#defines the function searching for and filtering indels within the read sequence	
-def SearchINDELsintoSAM(readNAME,mate,CIGAR,seq,qs,refposleft,tail=5):
-	m=re.compile(r'[a-z]', re.I)
-	if 'I' in CIGAR:
-		pcigar=CIGAR.partition('I')
-		if 'S' in pcigar[0]:
-			softclippingleft=int(pcigar[0].partition('S')[0]) # calc softclipped bases left
-		else:
-			softclippingleft=0 # no softclipped bases left
-		if 'S' in pcigar[-1]:
-			softclippingright=pcigar[-1].partition('S')[0] # calc softclipped bases right
-			rscnt=m.split(softclippingright)
-			if len(rscnt)>2:  #if  there are other options on the right end
-				softclippingright=int(rscnt[-2])
-			else:  #if there is only S option 
-				softclippingright=int(rscnt[0])
-		else:
-			softclippingright=0 # no softclipped bases right
-		if 'H' in pcigar[0]:
-			hardclippingleft=int(pcigar[0].partition('H')[0]) # calc hardclipped bases left
-		else:
-			hardclippingleft=0 # no hardtclipped bases left
-		if 'H' in pcigar[-1]:
-			hardclippingright=pcigar[-1].partition('H')[0] # calc hardclipped bases right
-			rhcnt=m.split(hardclippingright)
-			if len(rhcnt)>2:  #if  there are other options on the right end
-				hardclippingright=int(rhcnt[-2])
-			else:  #if there is only H option 
-				hardclippingright=int(rhcnt[0])			
-		else:
-			hardclippingright=0 # no hardclipped bases right
-		left=m.split(pcigar[0])
-		right=m.split(pcigar[-1])
-		numIns=int(left[-1])
-		left.pop(-1)
-		s=sum(left) # number of 5' flanking positions to Ins
-		lflank=s-softclippingleft # exclude softclipped bases from left pos calculation
-		lflank=s-hardclippingleft # exclude hardclipped bases from left pos calculation
-		error(right)
-		sr=sum(right)-(hardclippingright+softclippingright) # number of 3' flanking positions to Ins
-		rLeft=refposleft+lflank # modified
-		Ins=seq[s:s+numIns]
-		qsInsASCI=qs[s:s+numIns]
-		qsInsASCI.split()
-		qsIns=[]
-		type='Ins'
-		if mate>0:
-			strand='mate1'
-		elif mate==0:
-			strand='nondefined'
-		else:
-			strand='mate2'
-		if lflank >= tail and sr>= tail:
-			for x in qsInsASCI:
-				numeric=(ord(x)-33)
-				qsIns.append(numeric)
-		else:
-			qsIns='delete'
-		res=[]
-		res.append(type)
-		res.append(readNAME)
-		res.append(strand)
-		res.append(int(rLeft))
-		res.append(Ins)
-		res.append(qsIns)
-		return res
-	elif 'D' in CIGAR:
-		pcigar=CIGAR.partition('D')
-		if 'S' in pcigar[0]:
-			softclippingleft=int(pcigar[0].partition('S')[0]) # calc softclipped bases left
-		else:
-			softclippingleft=0 # no softclipped bases left
-		if 'S' in pcigar[-1]:
-			softclippingright=pcigar[-1].partition('S')[0] # calc softclipped bases right
-			rscnt=m.split(softclippingright)
-			if len(rscnt)>2:  #if  there are other options on the right end
-				softclippingright=int(rscnt[-2])
-			else:  #if there is only S option 
-				softclippingright=int(rscnt[0])
-		else:
-			softclippingright=0 # no softclipped bases right
-		if 'H' in pcigar[0]:
-			hardclippingleft=int(pcigar[0].partition('H')[0]) # calc hardclipped bases left
-		else:
-			hardclippingleft=0 # no hardtclipped bases left
-		if 'H' in pcigar[-1]:
-			hardclippingright=pcigar[-1].partition('H')[0] # calc hardclipped bases right
-			rhcnt=m.split(hardclippingright)
-			if len(rhcnt)>2:  #if  there are other options on the right end
-				hardclippingright=int(rhcnt[-2])
-			else:  #if there is only H option 
-				hardclippingright=int(rhcnt[0])			
-		else:
-			hardclippingright=0 # no hardclipped bases right
-		left=m.split(pcigar[0])
-		right=m.split(pcigar[-1])
-		nDel=int(left[-1])
-		left.pop(-1)
-		s=sum(left) # number of 5' flanking positions to Del
-		error(right)
-		sr=sum(right)-(hardclippingright+softclippingright) # number of 3' flanking positions to Del
-		lflank=s-softclippingleft # exclude softclipped bases from left pos calculation
-		lflank=s-hardclippingleft # exclude hardclipped bases from left pos calculation
-		rLeft=(refposleft+lflank)
-		lowlimit=rLeft+1
-		rRight=lowlimit+nDel
-		Del=range(lowlimit,rRight)
-		type='Del'
-		qsDel=[]
-		if lflank>=tail and sr>=tail:
-			qsLeft=qs[(s-5):s]
-			qsRight=qs[s:(s+5)]
-			qsL=[]
-			qsR=[]
-			for x in qsLeft:
-				qsL.append(ord(x)-33)
-			for x in qsRight:
-				qsR.append(ord(x)-33)
-			print 'qs=%s' % qs
-			print 'qsL=%s' % qsL
-			medL=median(qsL)
-			medR=median(qsR)
-			qsDel.append(medL)
-			qsDel.append(medR)
-		else:
-			qsDel='delete'
-		if mate>0:
-			strand='mate1'
-		elif mate==0:
-			strand='nondefined'
-		else:
-			strand='mate2'
-		res=[]
-		res.append(type)
-		res.append(readNAME)
-		res.append(strand)
-		res.append(int(rLeft))
-		res.append(Del)
-		res.append(qsDel)
-		return res
-	else:
-		pass 
+    try:
+        s=sum(list)
+        m=float(s)/float(len(list))
+        return m
+    except ZeroDivisionError:
+        m=0
+        return m
+
+def callDeletion(readNAME,mate,index,CIGAR,seq,qs,refposleft,tail=5):
+    if mate>0:
+        strand='mate1'
+    elif mate==0:
+        strand='nondefined'
+    else:
+        strand='mate2'
+    if CIGAR.count('D')-1 < index:
+        sys.stderr.write("Trying to call a non-existing deletion in CIGAR\n")
+        return ['Del',readNAME,strand,0,[0],'delete']
+    # Translate '=' and 'X' into 'M'
+    CIGAR=CIGAR.replace('=', 'M')
+    CIGAR=CIGAR.replace('X', 'M')
+    p_ALL=re.compile('(\d+)([MIDNSPH])')
+    cigarComponents=p_ALL.findall(CIGAR)
+    # Remove hardclipped ends
+    if 'H' in cigarComponents[0]:
+        cigarComponents.pop(0)
+    if 'H' in cigarComponents[-1]:
+        cigarComponents.pop(-1)
+    # Find position of the Deletion number "index"
+    position=0
+    delCount=0
+    delSize=0
+    flankL=0
+    flankR=0
+    side='L'
+    for i, v in enumerate(cigarComponents):
+        size,event=v[0:2]
+        size=int(size)
+        if side=='L':
+            if re.search('S',event):
+                position=position+size
+            elif re.search('[MI]',event):
+                position=position+size
+                flankL=flankL+size
+            elif re.search('D',event):
+                if index == delCount:
+                    delSize=size
+                    side='R'
+                else:
+                    delCount=delCount+1
+            elif re.search('[PN]',event):
+                continue
+            else:
+                sys.stderr.write("Unknown character in CIGAR string (%s)\n" % event)
+                return ['Del',readNAME,strand,0,[0],'delete']
+        else:
+            if re.search('[MI]',event):
+                flankR=flankR+size
+            elif re.search('[SDPN]',event):
+                continue
+            else:
+                sys.stderr.write("Unknown character in CIGAR string (%s)\n" % event)
+                return ['Del',readNAME,strand,0,[0],'delete']
+    #print "FINAL VALUES ==============="
+    #print "position=%i" % position
+    #print "delCount=%i" % delCount
+    #print "delSize=%i"% delSize
+    #print "flankL=%i" % flankL
+    #print "flankR=%i" %flankR
+    qsDel=[]
+    if flankL>=tail and flankR>=tail:
+        qsDel.append(median(list(map(lambda x: ord(x)-33,list(qs)[(position-5):position]))))
+        qsDel.append(median(list(map(lambda x: ord(x)-33,list(qs)[(position-5):position]))))
+    else:
+        qsDel='delete'
+    refDelStart=refposleft+flankL+1
+    refDelEnd=refDelStart+delSize
+    res=[]
+    res.append('Del')
+    res.append(readNAME)
+    res.append(strand)
+    res.append(refDelStart-1)
+    res.append(range(refDelStart,refDelEnd))
+    res.append(qsDel)
+    return res
+
+def callInsertion(readNAME,mate,index,CIGAR,seq,qs,refposleft,tail=5):
+    if mate>0:
+        strand='mate1'
+    elif mate==0:
+        strand='nondefined'
+    else:
+        strand='mate2'
+    if CIGAR.count('I')-1 < index:
+        sys.stderr.write("Trying to call a non-existing deletion in CIGAR\n")
+        return ['Ins',readNAME,strand,0,[0],'delete']
+    # Translate '=' and 'X' into 'M'
+    CIGAR=CIGAR.replace('=', 'M')
+    CIGAR=CIGAR.replace('X', 'M')
+    p_ALL=re.compile('(\d+)([MIDNSPH])')
+    cigarComponents=p_ALL.findall(CIGAR)
+    # Remove hardclipped ends
+    if 'H' in cigarComponents[0]:
+        cigarComponents.pop(0)
+    if 'H' in cigarComponents[-1]:
+        cigarComponents.pop(-1)
+    # Find position of the Insertion number "index"
+    position=0
+    insCount=0
+    insSize=0
+    flankL=0
+    flankR=0
+    side='L'
+    for i, v in enumerate(cigarComponents):
+        size,event=v[0:2]
+        size=int(size)
+        if side=='L':
+            if re.search('S',event):
+                position=position+size
+            elif re.search('M',event):
+                position=position+size
+                flankL=flankL+size
+            elif re.search('I',event):
+                if index == insCount:
+                    insSize=size
+                    side='R'
+                else:
+                    insCount=insCount+1
+            elif re.search('[DPN]',event):
+                continue
+            else:
+                sys.stderr.write("Unknown character in CIGAR string (%s)\n" % event)
+                return ['Del',readNAME,strand,0,[0],'delete']
+        else:
+            if re.search('[MI]',event):
+                flankR=flankR+size
+            elif re.search('[SDPN]',event):
+                continue
+            else:
+                sys.stderr.write("Unknown character in CIGAR string (%s)\n" % event)
+                return ['Del',readNAME,strand,0,[0],'delete']
+    #print "FINAL VALUES ==============="
+    #print "position=%i" % position
+    #print "insCount=%i" % insCount
+    #print "insSize=%i"% insSize
+    #print "flankL=%i" % flankL
+    #print "flankR=%i" %flankR
+    Ins=seq[position:(position+insSize)]
+    qsIns=[]
+    if flankL>=tail and flankR>=tail:
+        qsIns=list(map(lambda x: ord(x)-33,list(qs)[position:(position+insSize)]))
+    else:
+        qsIns='delete'
+    refInsStart=refposleft+flankL
+    res=[]
+    res.append('Ins')
+    res.append(readNAME)
+    res.append(strand)
+    res.append(refInsStart)
+    res.append(Ins)
+    res.append(qsIns)
+    return res
 
 #defines function searching for point mutations. It produces both the consensus base and variant(s) as output 
 def findmutations(A,C,G,T,Position, Ref, Cov):
-	oo = []
-	var=[]
-	bases=[]
-	if A>=5:
-		var.append(A)
-		bases.append('A')
-	if C>=5:
-		var.append(C)
-		bases.append('C')
-	if G>=5:
-		var.append(G)
-		bases.append('G')
-	if T>=5:
-		var.append(T)
-		bases.append('T')
-	if len(var)>=2:
-		if Ref in bases:
-			indexRef=bases.index(Ref)
-			bases.remove(Ref)
-			var.remove(var[indexRef])
-		o=[Position, Ref, Cov, bases, var]
-		return o
-	elif len(var)==1 and Ref not in bases:
-		o=[Position, Ref, Cov, bases, var]
-		return o
-	else:	
-		return oo
+    oo = []
+    var=[]
+    bases=[]
+    if A>=5:
+        var.append(A)
+        bases.append('A')
+    if C>=5:
+        var.append(C)
+        bases.append('C')
+    if G>=5:
+        var.append(G)
+        bases.append('G')
+    if T>=5:
+        var.append(T)
+        bases.append('T')
+    if len(var)>=2:
+        if Ref in bases:
+            indexRef=bases.index(Ref)
+            bases.remove(Ref)
+            var.remove(var[indexRef])
+        o=[Position, Ref, Cov, bases, var]
+        return o
+    elif len(var)==1 and Ref not in bases:
+        o=[Position, Ref, Cov, bases, var]
+        return o
+    else:    
+        return oo
 
 #Wilson confidence interval lower bound
 def CIW_LOW(het, Covbase):
-	'''The function calculates the heteroplasmic fraction and the related
-	confidence interval with 95% of coverage probability,
-	considering a Wilson score interval when n<=40 
-	CIw= [1/(1+(1/n)*z^2)] * [p + (1/2n)*z^2 +- z(1/n *(p*q) + ((1/(4n^2))*z^2))^1/2]
-	'''
-	p=het
-	n=Covbase
-	z=1.96
-	q=1-het
-	num=p*q
-	squarez=z*z
-	squaren=n*n
-	wilsonci_low=round((p+(z*z)/(2*n)-z*(math.sqrt(p*q/n+(z*z)/(4*(n*n)))))/(1+z*z/n),3)
-	if wilsonci_low<0.0:
-		return 0.0
-	else:
-		return wilsonci_low
-		
+    '''The function calculates the heteroplasmic fraction and the related
+    confidence interval with 95% of coverage probability,
+    considering a Wilson score interval when n<=40 
+    CIw= [1/(1+(1/n)*z^2)] * [p + (1/2n)*z^2 +- z(1/n *(p*q) + ((1/(4n^2))*z^2))^1/2]
+    '''
+    p=het
+    n=Covbase
+    z=1.96
+    q=1-het
+    num=p*q
+    squarez=z*z
+    squaren=n*n
+    wilsonci_low=round((p+(z*z)/(2*n)-z*(math.sqrt(p*q/n+(z*z)/(4*(n*n)))))/(1+z*z/n),6)
+    if wilsonci_low<0.0:
+        return 0.0
+    else:
+        return wilsonci_low
+        
 #Wilson confidence interval upper bound
 def CIW_UP(het, Covbase):
-	'''The function calculates the heteroplasmic fraction and the related
-	confidence interval with 95% of coverage probability,
-	considering a Wilson score interval when n<=40 
-	CIw= [1/(1+(1/n)*z^2)] * [p + (1/2n)*z^2 +- z(1/n *(p*q) + ((1/(4n^2))*z^2))^1/2]
-	'''
-	p=het
-	n=Covbase
-	z=1.96
-	q=1-het
-	num=p*q
-	squarez=z*z
-	squaren=n*n
-	wilsonci_up=round((p+(z*z)/(2*n)+z*(math.sqrt(p*q/n+(z*z)/(4*(n*n)))))/(1+z*z/n),3)
-	if wilsonci_up>1.0:
-		return 1.0
-	else:
-		return wilsonci_up
+    '''The function calculates the heteroplasmic fraction and the related
+    confidence interval with 95% of coverage probability,
+    considering a Wilson score interval when n<=40 
+    CIw= [1/(1+(1/n)*z^2)] * [p + (1/2n)*z^2 +- z(1/n *(p*q) + ((1/(4n^2))*z^2))^1/2]
+    '''
+    p=het
+    n=Covbase
+    z=1.96
+    q=1-het
+    num=p*q
+    squarez=z*z
+    squaren=n*n
+    wilsonci_up=round((p+(z*z)/(2*n)+z*(math.sqrt(p*q/n+(z*z)/(4*(n*n)))))/(1+z*z/n),6)
+    if wilsonci_up>1.0:
+        return 1.0
+    else:
+        return wilsonci_up
 
-#Agresti-Coull confidence interval lower bound		
+#Agresti-Coull confidence interval lower bound        
 def CIAC_LOW(cov,Covbase):
-	'''The function calculates the heteroplasmic fraction and the related confidence interval 
-	for heteroplasmic fraction with 95% of coverage probability,considering the 
-	Agresti-Coull interval when n>40'''
-	z=1.96
-	n=Covbase
-	X=cov+(z*z)/2
-	#print X, "X"
-	N=n+(z*z)
-	#print N, "N"
-	P=X/N
-	#print P, "P"
-	Q=1-P
-	#print Q, "Q"
-	agresticoull_low=round(P-(z*(math.sqrt(P*Q/N))),3)
-	if agresticoull_low<0.0:
-		return 0.0
-	else:
-		return agresticoull_low
+    '''The function calculates the heteroplasmic fraction and the related confidence interval 
+    for heteroplasmic fraction with 95% of coverage probability,considering the 
+    Agresti-Coull interval when n>40'''
+    z=1.96
+    n=Covbase
+    X=cov+(z*z)/2
+    #print X, "X"
+    N=n+(z*z)
+    #print N, "N"
+    P=X/N
+    #print P, "P"
+    Q=1-P
+    #print Q, "Q"
+    agresticoull_low=round(P-(z*(math.sqrt(P*Q/N))),6)
+    if agresticoull_low<0.0:
+        return 0.0
+    else:
+        return agresticoull_low
 
-#Agresti-Coull confidence interval upper bound	
+#Agresti-Coull confidence interval upper bound    
 def CIAC_UP(cov,Covbase):
-	'''The function calculates the heteroplasmic fraction and the related confidence interval 
-	for heteroplasmic fraction with 95% of coverage probability,considering the 
-	Agresti-Coull interval when n>40'''
-	z=1.96
-	n=Covbase
-	X=cov+(z*z)/float(2)
-	#print "X",X
-	N=n+(z*z)
-	#print "N", N
-	P=X/N
-	#print "P", P
-	Q=1-P
-	#print "Q",Q
-	agresticoull_up=round(P+(z*(math.sqrt(P*Q/N))),3)
-	if agresticoull_up>1.0:
-		return 1.0
-	else:	
-		return agresticoull_up
+    '''The function calculates the heteroplasmic fraction and the related confidence interval 
+    for heteroplasmic fraction with 95% of coverage probability,considering the 
+    Agresti-Coull interval when n>40'''
+    z=1.96
+    n=Covbase
+    X=cov+(z*z)/float(2)
+    #print "X",X
+    N=n+(z*z)
+    #print "N", N
+    P=X/N
+    #print "P", P
+    Q=1-P
+    #print "Q",Q
+    agresticoull_up=round(P+(z*(math.sqrt(P*Q/N))),6)
+    if agresticoull_up>1.0:
+        return 1.0
+    else:    
+        return agresticoull_up
 
 #IUPAC dictionary
 dIUPAC={'R':['A','G'],'Y':['C','T'],'S':['G','C'],'W':['A','T'],'K':['G','T'],'M':['A','C'],'B':['C','G','T'],'D':['A','G','T'],'H':['A','C','T'],'V':['A','C','G'],'N':['A','C','G','T']}
 #searches for IUPAC codes and returns the ambiguity
 #returns '' if nucleotide in reference is N
 def getIUPAC(ref_var, dIUPAC):
-	iupac_code = ['']
-	for i in dIUPAC.iteritems():
-		i[1].sort()
-		if ref_var == i[1]:
-			iupac_code= [i[0]]
-	return iupac_code
-			
+    iupac_code = ['']
+    for i in dIUPAC.iteritems():
+        i[1].sort()
+        if ref_var == i[1]:
+            iupac_code= [i[0]]
+    return iupac_code
+            
 
 def mtvcf_main_analysis(mtable, sam, name2, tail=5):
-	mtable=[i.split('\t') for i in mtable]
-	mtable.remove(mtable[0])
-	sam=sam.readlines()
-	sam=[i.split('\t') for i in sam]
-	#table of description of CIGAR characters
-	#M=alignment match (can be match or mismatch)
-	#I=insertion to the reference
-	#D=deletion from the reference
-	#N=skipped region from the reference
-	#S=soft clipping (clipped sequences present in SEQ)
-	#H=hard clipping (clipped sequences NOT presenti in SEQ)
-	#P=padding (silent deletion from padded reference)
-	#=sequence match
-	#X sequence mismatch
-	#deletes flag and maq values from rows
-	for i in sam:
-		i.remove(i[1])
-		i.remove(i[3])
-	#includes only values used for parsing
-	c=0
-	while c<len(sam):
-		sam[c]=sam[c][0:9]
-		c+=1
-	#assigns a null value to fields. NB: refpos is the leftmost position of the subject seq minus 1.
-	CIGAR=''
-	readNAME=''
-	seq=''
-	qs=''
-	refposleft=''
-	mate=''
-	#assembly mtDNA ref sequence from MT-table
-	mtDNA=[]
-	for i in mtable:
-		mtDNA.append((i[1]).strip())
-	mtDNAseq="".join(mtDNA)
-	#create list of the total depth per position across the mtDNA
-	Coverage=[]
-	for i in mtable:
-		Coverage.append((i[3]).strip())
-	#-----------------------------------------------------------------------------------------
-	#apply functions to sam file and write outputs into a dictionary
-	dic={}
-	dic['Ins']=[]
-	dic['Del']=[]
-	print "\n\nsearching for indels in {0}.. please wait...\n\n".format(name2)
-	for i in sam:
-		#print i
-		[CIGAR, readNAME, seq, qs, refposleft, mate] = varnames(i)
-		#print "varnames is", varnames(i)
-		#print "CIGAR", CIGAR
-		# varnames()
-		if 'I' in CIGAR or 'D' in CIGAR:
-			r=SearchINDELsintoSAM(readNAME,mate,CIGAR,seq, qs,refposleft,tail=tail)
-			dic[r[0]].append(r[1:])
-	#############
-	rposIns={}
-	rposDel={}
-	for i in dic['Ins']:
-		if i[2] not in rposIns:
-			if i[-1] == 'delete':
-				pass
-			else:
-				rposIns[i[2]]=[]
-				rposIns[i[2]].append(i[3:])
-		else:
-			if i[-1] == 'delete':
-				pass
-			else:
-				rposIns[i[2]].append(i[3:])
+    mtable=[i.split('\t') for i in mtable]
+    mtable.remove(mtable[0])
+    sam=sam.readlines()
+    sam=[i.split('\t') for i in sam]
+    #table of description of CIGAR characters
+    #M=alignment match (can be match or mismatch)
+    #I=insertion to the reference
+    #D=deletion from the reference
+    #N=skipped region from the reference
+    #S=soft clipping (clipped sequences present in SEQ)
+    #H=hard clipping (clipped sequences NOT presenti in SEQ)
+    #P=padding (silent deletion from padded reference)
+    #=sequence match
+    #X sequence mismatch
+    #deletes flag and maq values from rows
+    for i in sam:
+        i.remove(i[1])
+        i.remove(i[3])
+    #includes only values used for parsing
+    c=0
+    while c<len(sam):
+        sam[c]=sam[c][0:9]
+        c+=1
+    #assigns a null value to fields. NB: refpos is the leftmost position of the subject seq minus 1.
+    CIGAR=''
+    readNAME=''
+    seq=''
+    qs=''
+    refposleft=''
+    mate=''
+    #assembly mtDNA ref sequence from MT-table
+    mtDNA=[]
+    for i in mtable:
+        mtDNA.append((i[1]).strip())
+    mtDNAseq="".join(mtDNA)
+    #create list of the total depth per position across the mtDNA
+    Coverage=[]
+    for i in mtable:
+        Coverage.append((i[3]).strip())
+    #-----------------------------------------------------------------------------------------
+    #apply functions to sam file and write outputs into a dictionary
+    dic={}
+    dic['Ins']=[]
+    dic['Del']=[]
+    print "\n\nsearching for indels in {0}.. please wait...\n\n".format(name2)
+    for i in sam:
+        [CIGAR, readNAME, seq, qs, refposleft, mate] = varnames(i)
+        # Look for ALL deletions present in the read
+        for i in range(0,CIGAR.count('D')):
+            r=callDeletion(readNAME,mate,i,CIGAR,seq, qs,refposleft,tail=tail)
+            dic[r[0]].append(r[1:])
+        # Look for ALL insertions present in the read
+        for i in range(0,CIGAR.count('I')):
+            r=callInsertion(readNAME,mate,i,CIGAR,seq, qs,refposleft,tail=tail)
+            dic[r[0]].append(r[1:])
+            
+    #############
+    rposIns={}
+    rposDel={}
+    for i in dic['Ins']:
+        if i[-1] == 'delete':
+            continue
+        if i[2] not in rposIns:
+            rposIns[i[2]]=[]
+            rposIns[i[2]].append(i[3:])
+        else:
+            rposIns[i[2]].append(i[3:])
 
-	for i in dic['Del']:
-		if i[2] not in rposDel:
-			if i[-1]=='delete':
-				pass
-			else:
-				rposDel[i[2]]=[]			
-				rposDel[i[2]].append(i[3:])
-		else:
-			if i[-1]=='delete':
-				pass
-			else:
-				rposDel[i[2]].append(i[3:])
-	#print "Ins mutations", rposIns.keys()
-	#print "Del mutations", rposDel.keys()
-	############
-	dicqsDel={}
-	dicqsIns={}
-	#########
-	for i in rposIns:
-		dicqsIns[i]=[]
-		for x in rposIns.get(i):
-			for j in range(len(x[-1])):
-				if int(x[-1][j])>=25:
-					pass
-				else:
-					x[-1][j]='-'
-			if '-' in x[-1]:
-				pass
-			else:
-				dicqsIns[i].append(x)
-	################
-	for i in rposDel:
-		dicqsDel[i]=[]
-		for x in rposDel.get(i):
-			for j in range(len(x[-1])):
-				if int(x[-1][j])>=25:
-					pass
-				else:
-					x[-1][j]='-'
-			if '-' in x[-1]:
-				pass
-			else:
-				dicqsDel[i].append(x)
-	#print "dicqsIns is", dicqsIns
-	#print "dicqsDel is", dicqsDel
-	##########
-	dicIns={}
-	dicDel={}
-	for i in dicqsIns:
-		dicIns[i]=[]
-		b=[]
-		a=dicqsIns.get(i)
-		for j in a:
-			b.append(str(j[0]))
-		s=set(b)
-		for x in s:
-			if b.count(x)>=5:
-				for z in a:
-					if x in z:
-						dicIns[i].append(z)
-	for i in dicqsDel:
-		dicDel[i]=[]
-		b=[]
-		a=dicqsDel.get(i)
-		for j in a:
-			b.append(str(j[0]))
-		s=set(b)
-		for x in s:
-			l=b.count(x)
-			if l>=5:
-				for z in a:
-					if x==str(z[0]):
-						dicDel[i].append(z)
-	#print "dicIns is", dicIns
-	#print "dicDel is", dicDel
-	Final={}
-	for i in dicIns:
-		Final[i]=[]
-		qs1=[]
-		bases1=[]
-		bases2=[]
-		a=dicIns.get(i)
-		l=len(dicIns.get(i))
-		depth=[]
-		if l>0:
-			for x in a:
-				bases2.append(x[0])
-			b=set(bases2)
-			for z in b:
-				n=bases2.count(z)
-				if n>=5:
-					qs2=[]
-					for x in a:
-						if str(x[0])==z:
-							qs2.extend(x[-1])
-					bases1.append(z)
-					qs1.append(median(qs2))
-					depth.append(n)
-			r=['ins', bases1, qs1, depth]
-			Final[i].append(r)
-	for i in dicDel:
-		if i in Final:
-			qs1=[]
-			bases1=[]
-			bases2=[]
-			a=dicDel.get(i)
-			l=len(dicDel.get(i))
-			depth=[]
-			if l>0:
-				for x in a:
-					bases2.append(str(x[0]))
-				b=set(bases2)
-				for z in b:
-					n=bases2.count(z)
-					if n>=5:
-						qs2=[]
-						for x in a:
-							if str(x[0])==z:
-								qs2.extend(x[-1])
-						bases1.append(z)
-						qs1.append(median(qs2))
-						depth.append(n)
-				r=['del', bases1, qs1, depth]
-				Final[i].append(r)
-		else:
-			Final[i]=[]
-			qs1=[]
-			bases1=[]
-			bases2=[]
-			a=dicDel.get(i)
-			l=len(dicDel.get(i))
-			depth=[]
-			if l>0:
-				for x in a:
-					bases2.append(str(x[0]))
-				b=set(bases2)
-				for z in b:
-					n=bases2.count(z)
-					if n>=5:
-						qs2=[]
-						for x in a:
-							if str(x[0])==z:
-								qs2.extend(x[-1])
-						bases1.append(z)
-						qs1.append(median(qs2))
-						depth.append(n)
-				r=['del', bases1, qs1, depth]
-				Final[i].append(r)
-	ref=sorted(Final)
-	#print name2, "ref is", ref
-	Indels={}
-	Indels[name2]=[]
-	for i in ref:
-		if len(Final.get(i))>0:
-			for x in Final.get(i):
-				if x[0]=='ins':
-					#print x, "is ins"
-					bases=x[1]
-					qs=x[2]
-					cov=x[3]
-					Refbase=mtDNAseq[int(i)-1]
-					Variant=map(lambda x:Refbase+x,bases)
-					InsCov=map(lambda x:int(x),cov)
-					Covbase=int(Coverage[int(i)-1])
-					Covbase=Covbase+sum(InsCov)
-					QS=map(lambda x:round(float(x),2),qs)
-					hetfreq=map(lambda x:heteroplasmy(x,Covbase),InsCov)
-					#print InsCov
-					if Covbase <=40:
-						het_ci_low=map(lambda x: CIW_LOW(x, Covbase), hetfreq)
-						het_ci_up=map(lambda x: CIW_UP(x, Covbase), hetfreq)					
-					else:
-						het_ci_low=map(lambda x: CIAC_LOW(x,Covbase), InsCov)
-						het_ci_up=map(lambda x: CIAC_UP(x,Covbase), InsCov)
-					ins=[i, Refbase, Covbase, Variant, InsCov, QS, hetfreq, het_ci_low, het_ci_up,'ins']
-					Indels[name2].append(ins)
-				else:
-					#print x, "is del"
-					Refbase=[]
-					cov=x[3]
-					DelCov=map(lambda x:int(x),cov)
-					qs=x[2]
-					deletions=[]
-					Covbase=[]
-					for j in xrange(len(x[1])):
-						dels=ast.literal_eval(x[1][j])
-						delflank=dels[0]-2
-						delfinal=dels[-1]
-						covlist=Coverage[delflank:delfinal]
-						convert=map(lambda x:int(x), covlist)
-						Covbase.append(median(convert))
-					maxcovbase=max(Covbase)
-					Covbase=int(maxcovbase)+sum(DelCov)
-					hetfreq=map(lambda x:heteroplasmy(x,Covbase),DelCov)
-					#print DelCov
-					if Covbase <=40:
-						het_ci_low=map(lambda x: CIW_LOW(x, Covbase), hetfreq)
-						het_ci_up=map(lambda x: CIW_UP(x, Covbase), hetfreq)	
-					else:
-						het_ci_low=map(lambda x: CIAC_LOW(x,Covbase), DelCov)
-						het_ci_up=map(lambda x: CIAC_UP(x,Covbase), DelCov)
-					for j in xrange(len(x[1])):
-						dels=ast.literal_eval(x[1][j])
-						delflank=dels[0]-2
-						delfinal=dels[-1]
-						deletions.append(mtDNAseq[delflank])
-						Refbase.append(mtDNAseq[delflank:delfinal])
-					dele=[(dels[0]-1), Refbase, Covbase, deletions, DelCov, qs, hetfreq, het_ci_low, het_ci_up, 'del']
-					Indels[name2].append(dele)
-	#print name2, "Indels:", Indels
-	Subst={}
-	Subst[name2] = []
-	print "\n\nsearching for mismatches in {0}.. please wait...\n\n".format(name2)
-	for i in mtable:
-		b=ast.literal_eval((i[-1]).strip())
-		# print b
-		varnames2(b,i)
-		#print "varnames2 is", varnames2(b,i)
-		#varnames2()
-		a=findmutations(A,C,G,T,Position,Ref,Cov)
-		if len(a) > 0:
-			hetfreq=map(lambda x:heteroplasmy(x,Cov),a[-1])		
-			if Cov<=40:
-				het_ci_low=map(lambda x: CIW_LOW(x,Cov),hetfreq)
-				het_ci_up=map(lambda x: CIW_UP(x,Cov),hetfreq)
-			else:
-				het_ci_low=map(lambda x: CIAC_LOW(x,Cov), a[-1])
-				het_ci_up=map(lambda x: CIAC_UP(x,Cov), a[-1])
-			a.append('PASS')
-			a.append(hetfreq)
-			a.append(het_ci_low)
-			a.append(het_ci_up)
-			a.append('mism')
-			Subst[name2].append(a)
-	#print name2, "Subst:", Subst
-	Indels[name2].extend(Subst[name2])
-	return Indels # it's a dictionary
-	# dict_of_dicts.update(Indels)
-	# return dict_of_dicts
+    for i in dic['Del']:
+        if i[-1]=='delete':
+            continue
+        if i[2] not in rposDel:
+            rposDel[i[2]]=[]            
+            rposDel[i[2]].append(i[3:])
+        else:
+            rposDel[i[2]].append(i[3:])
+    ############
+    dicqsDel={}
+    dicqsIns={}
+    #########
+    for i in rposIns:
+        dicqsIns[i]=[]
+        for x in rposIns.get(i):
+            for j in range(len(x[-1])):
+                if int(x[-1][j])>=25:
+                    pass
+                else:
+                    x[-1][j]='-'
+            if '-' in x[-1]:
+                pass
+            else:
+                dicqsIns[i].append(x)
+    ################
+    for i in rposDel:
+        dicqsDel[i]=[]
+        for x in rposDel.get(i):
+            for j in range(len(x[-1])):
+                if int(x[-1][j])>=25:
+                    pass
+                else:
+                    x[-1][j]='-'
+            if '-' in x[-1]:
+                pass
+            else:
+                dicqsDel[i].append(x)
+    #print "dicqsIns is", dicqsIns
+    #print "dicqsDel is", dicqsDel
+    ##########
+    dicIns={}
+    dicDel={}
+    for i in dicqsIns:
+        dicIns[i]=[]
+        b=[]
+        a=dicqsIns.get(i)
+        for j in a:
+            b.append(str(j[0]))
+        s=set(b)
+        for x in s:
+            if b.count(x)>=5:
+                for z in a:
+                    if x in z:
+                        dicIns[i].append(z)
+    for i in dicqsDel:
+        dicDel[i]=[]
+        b=[]
+        a=dicqsDel.get(i)
+        for j in a:
+            b.append(str(j[0]))
+        s=set(b)
+        for x in s:
+            l=b.count(x)
+            if l>=5:
+                for z in a:
+                    if x==str(z[0]):
+                        dicDel[i].append(z)
+    #print "dicIns is", dicIns
+    #print "dicDel is", dicDel
+    Final={}
+    for i in dicIns:
+        Final[i]=[]
+        qs1=[]
+        bases1=[]
+        bases2=[]
+        a=dicIns.get(i)
+        l=len(dicIns.get(i))
+        depth=[]
+        if l>0:
+            for x in a:
+                bases2.append(x[0])
+            b=set(bases2)
+            for z in b:
+                n=bases2.count(z)
+                if n>=5:
+                    qs2=[]
+                    for x in a:
+                        if str(x[0])==z:
+                            qs2.extend(x[-1])
+                    bases1.append(z)
+                    qs1.append(median(qs2))
+                    depth.append(n)
+            r=['ins', bases1, qs1, depth]
+            Final[i].append(r)
+    for i in dicDel:
+        if i in Final:
+            qs1=[]
+            bases1=[]
+            bases2=[]
+            a=dicDel.get(i)
+            l=len(dicDel.get(i))
+            depth=[]
+            if l>0:
+                for x in a:
+                    bases2.append(str(x[0]))
+                b=set(bases2)
+                for z in b:
+                    n=bases2.count(z)
+                    if n>=5:
+                        qs2=[]
+                        for x in a:
+                            if str(x[0])==z:
+                                qs2.extend(x[-1])
+                        bases1.append(z)
+                        qs1.append(median(qs2))
+                        depth.append(n)
+                r=['del', bases1, qs1, depth]
+                Final[i].append(r)
+        else:
+            Final[i]=[]
+            qs1=[]
+            bases1=[]
+            bases2=[]
+            a=dicDel.get(i)
+            l=len(dicDel.get(i))
+            depth=[]
+            if l>0:
+                for x in a:
+                    bases2.append(str(x[0]))
+                b=set(bases2)
+                for z in b:
+                    n=bases2.count(z)
+                    if n>=5:
+                        qs2=[]
+                        for x in a:
+                            if str(x[0])==z:
+                                qs2.extend(x[-1])
+                        bases1.append(z)
+                        qs1.append(median(qs2))
+                        depth.append(n)
+                r=['del', bases1, qs1, depth]
+                Final[i].append(r)
+    ref=sorted(Final)
+    #print name2, "ref is", ref
+    Indels={}
+    Indels[name2]=[]
+    for i in ref:
+        if len(Final.get(i))>0:
+            for x in Final.get(i):
+                if x[0]=='ins':
+                    #print x, "is ins"
+                    bases=x[1]
+                    qs=x[2]
+                    cov=x[3]
+                    Refbase=mtDNAseq[int(i)-1]
+                    Variant=map(lambda x:Refbase+x,bases)
+                    InsCov=map(lambda x:int(x),cov)
+                    Covbase=int(Coverage[int(i)-1])
+                    Covbase=Covbase+sum(InsCov)
+                    QS=map(lambda x:round(float(x),6),qs)
+                    hetfreq=map(lambda x:heteroplasmy(x,Covbase),InsCov)
+                    #print InsCov
+                    if Covbase <=40:
+                        het_ci_low=map(lambda x: CIW_LOW(x, Covbase), hetfreq)
+                        het_ci_up=map(lambda x: CIW_UP(x, Covbase), hetfreq)                    
+                    else:
+                        het_ci_low=map(lambda x: CIAC_LOW(x,Covbase), InsCov)
+                        het_ci_up=map(lambda x: CIAC_UP(x,Covbase), InsCov)
+                    ins=[i, Refbase, Covbase, Variant, InsCov, QS, hetfreq, het_ci_low, het_ci_up,'ins']
+                    Indels[name2].append(ins)
+                else:
+                    #print x, "is del"
+                    Refbase=[]
+                    cov=x[3]
+                    DelCov=map(lambda x:int(x),cov)
+                    qs=x[2]
+                    deletions=[]
+                    Covbase=[]
+                    for j in xrange(len(x[1])):
+                        dels=ast.literal_eval(x[1][j])
+                        delflank=dels[0]-2
+                        delfinal=dels[-1]
+                        covlist=Coverage[delflank:delfinal]
+                        convert=map(lambda x:int(x), covlist)
+                        Covbase.append(median(convert))
+                    maxcovbase=max(Covbase)
+                    Covbase=int(maxcovbase)+sum(DelCov)
+                    hetfreq=map(lambda x:heteroplasmy(x,Covbase),DelCov)
+                    #print DelCov
+                    if Covbase <=40:
+                        het_ci_low=map(lambda x: CIW_LOW(x, Covbase), hetfreq)
+                        het_ci_up=map(lambda x: CIW_UP(x, Covbase), hetfreq)    
+                    else:
+                        het_ci_low=map(lambda x: CIAC_LOW(x,Covbase), DelCov)
+                        het_ci_up=map(lambda x: CIAC_UP(x,Covbase), DelCov)
+                    for j in xrange(len(x[1])):
+                        dels=ast.literal_eval(x[1][j])
+                        delflank=dels[0]-2
+                        delfinal=dels[-1]
+                        deletions.append(mtDNAseq[delflank])
+                        Refbase.append(mtDNAseq[delflank:delfinal])
+                    dele=[(dels[0]-1), Refbase, Covbase, deletions, DelCov, qs, hetfreq, het_ci_low, het_ci_up, 'del']
+                    Indels[name2].append(dele)
+    #print name2, "Indels:", Indels
+    Subst={}
+    Subst[name2] = []
+    print "\n\nsearching for mismatches in {0}.. please wait...\n\n".format(name2)
+    for i in mtable:
+        b=ast.literal_eval((i[-1]).strip())
+        # print b
+        varnames2(b,i)
+        #print "varnames2 is", varnames2(b,i)
+        #varnames2()
+        a=findmutations(A,C,G,T,Position,Ref,Cov)
+        if len(a) > 0:
+            hetfreq=map(lambda x:heteroplasmy(x,Cov),a[-1])        
+            if Cov<=40:
+                het_ci_low=map(lambda x: CIW_LOW(x,Cov),hetfreq)
+                het_ci_up=map(lambda x: CIW_UP(x,Cov),hetfreq)
+            else:
+                het_ci_low=map(lambda x: CIAC_LOW(x,Cov), a[-1])
+                het_ci_up=map(lambda x: CIAC_UP(x,Cov), a[-1])
+            a.append('PASS')
+            a.append(hetfreq)
+            a.append(het_ci_low)
+            a.append(het_ci_up)
+            a.append('mism')
+            Subst[name2].append(a)
+    #print name2, "Subst:", Subst
+    Indels[name2].extend(Subst[name2])
+    return Indels # it's a dictionary
+    # dict_of_dicts.update(Indels)
+    # return dict_of_dicts
 
 
 ### END OF MAIN ANALYSIS
@@ -1008,51 +660,52 @@ def mtvcf_main_analysis(mtable, sam, name2, tail=5):
 #print dict_of_dicts
 
 def get_consensus_single(i, hf=0.8):
-	consensus_value = []
-	if len(i) != 0:
-		#consensus_value = []
-		#for var in dict_of_dicts[i]:
-		for var in i:
-			print var[0], var[-1], max(var[6])
-			if var[-1] == 'mism' and max(var[6]) >= hf:
-				index=var[6].index(max(var[6]))
-				basevar=var[3][index]
-				res=[var[0], [basevar], 'mism']
-				consensus_value.append(res)
-				#Consensus[i].append(res)
-			elif var[-1] == 'mism' and max(var[6]) < hf:
-				basevar=[var[1]]+var[3]
-				basevar.sort()
-				a=getIUPAC(basevar, dIUPAC)
-				res=[var[0], a, 'mism']
-				consensus_value.append(res)
-				#Consensus[i].append(res)
-			elif var[-1] == 'ins' and max(var[6]) >= hf:
-				index=var[6].index(max(var[6]))
-				basevar=var[3][index]
-				res=[var[0], [basevar], 'ins']
-				consensus_value.append(res)
-				#Consensus[i].append(res)
-			elif var[-1] == 'del' and max(var[6]) >= hf:
-				index=var[6].index(max(var[6]))
-				basevar=var[3][index]
-				del_length=len(var[1][0]) - len(basevar)
-				start_del=var[0]+1
-				end_del=start_del+del_length
-				res=[var[0], range(start_del,end_del), 'del']
-				consensus_value.append(res)
-				#Consensus[i].append(res)
-			else:
-				pass
-	return consensus_value
+    consensus_value = []
+    if len(i) != 0:
+        #consensus_value = []
+        #for var in dict_of_dicts[i]:
+        for var in i:
+            #print var[0], var[-1], max(var[6])
+            print '%i %s %.5f' % (var[0], var[-1], max(var[6]))
+            if var[-1] == 'mism' and max(var[6]) >= hf:
+                index=var[6].index(max(var[6]))
+                basevar=var[3][index]
+                res=[var[0], [basevar], 'mism']
+                consensus_value.append(res)
+                #Consensus[i].append(res)
+            elif var[-1] == 'mism' and max(var[6]) < hf:
+                basevar=[var[1]]+var[3]
+                basevar.sort()
+                a=getIUPAC(basevar, dIUPAC)
+                res=[var[0], a, 'mism']
+                consensus_value.append(res)
+                #Consensus[i].append(res)
+            elif var[-1] == 'ins' and max(var[6]) >= hf:
+                index=var[6].index(max(var[6]))
+                basevar=var[3][index]
+                res=[var[0], [basevar], 'ins']
+                consensus_value.append(res)
+                #Consensus[i].append(res)
+            elif var[-1] == 'del' and max(var[6]) >= hf:
+                index=var[6].index(max(var[6]))
+                basevar=var[3][index]
+                del_length=len(var[1][0]) - len(basevar)
+                start_del=var[0]+1
+                end_del=start_del+del_length
+                res=[var[0], range(start_del,end_del), 'del']
+                consensus_value.append(res)
+                #Consensus[i].append(res)
+            else:
+                pass
+    return consensus_value
 
 def get_consensus(dict_of_dicts):
-	"""Dictionary of consensus variants, for fasta sequences"""
-	Consensus = {}
-	for i in dict_of_dicts:
-		#print i
-		Consensus[i] = get_consensus_single(dict_of_dicts[i])
-	return Consensus
+    """Dictionary of consensus variants, for fasta sequences"""
+    Consensus = {}
+    for i in dict_of_dicts:
+        #print i
+        Consensus[i] = get_consensus_single(dict_of_dicts[i])
+    return Consensus
 
 def VCFoutput(dict_of_dicts, reference='RSRS'):
     print "Reference sequence used for VCF: %s" % reference
@@ -1142,7 +795,7 @@ def VCFoutput(dict_of_dicts, reference='RSRS'):
                                     i._sample_indexes[sample][0].append(aplotype)
                                     i._sample_indexes[sample][2].append(variant[6][x])
                                     i._sample_indexes[sample][3].append(variant[7][x])
-                                    i._sample_indexes[sample][4].append(variant[8][x])									
+                                    i._sample_indexes[sample][4].append(variant[8][x])                                    
                                 else:
                                     i.REF.append(variant[1][x])
                                     #print i.REF, variant[1], i.ALT
@@ -1155,7 +808,7 @@ def VCFoutput(dict_of_dicts, reference='RSRS'):
                                     i._sample_indexes[sample][0].append(aplotype)
                                     i._sample_indexes[sample][2].append(variant[6][x])
                                     i._sample_indexes[sample][3].append(variant[7][x])
-                                    i._sample_indexes[sample][4].append(variant[8][x])									
+                                    i._sample_indexes[sample][4].append(variant[8][x])                                    
                                     #print i
                         #for multiple variants of a position in different individuals
                         elif sample not in i.samples and type(variant[1]) == type(list()):
@@ -1256,9 +909,9 @@ def VCFoutput(dict_of_dicts, reference='RSRS'):
                                     i._sample_indexes[sample][0].append(genotype)
                                     i._sample_indexes[sample][2].append(variant[6][0])
                                     i._sample_indexes[sample][3].append(variant[7][0])
-                                    i._sample_indexes[sample][4].append(variant[8][0])																										
+                                    i._sample_indexes[sample][4].append(variant[8][0])                                                                                                        
                                 else:
-                                    i._sample_indexes.setdefault(sample,[genotype, variant[2], variant[6], variant[7], variant[8]])									                                    
+                                    i._sample_indexes.setdefault(sample,[genotype, variant[2], variant[6], variant[7], variant[8]])                                                                        
                                 #if a deletion, add a further reference base
                                 #print i
                                 if type(variant[1])== type(list()):
@@ -1277,7 +930,7 @@ def VCFoutput(dict_of_dicts, reference='RSRS'):
                                     i._sample_indexes[sample][0].append(genotype)
                                     i._sample_indexes[sample][2].append(variant[6][0])
                                     i._sample_indexes[sample][3].append(variant[7][0])
-                                    i._sample_indexes[sample][4].append(variant[8][0])									
+                                    i._sample_indexes[sample][4].append(variant[8][0])                                    
                                 else:                                
                                     i._sample_indexes.setdefault(sample,[genotype, variant[2], variant[6], variant[7], variant[8]])
     for r in VCF_RECORDS:
@@ -1334,7 +987,7 @@ def VCFoutput(dict_of_dicts, reference='RSRS'):
     out.write('##FORMAT=<ID=DP,Number=.,Type=Integer,Description="Reads covering the REF position">\n')
     out.write('##FORMAT=<ID=HF,Number=.,Type=Float,Description="Heteroplasmy Frequency of variant allele">\n')
     out.write('##FORMAT=<ID=CILOW,Number=.,Type=Float,Description="Value defining the lower limit of the confidence interval of the heteroplasmy fraction">\n')
-    out.write('##FORMAT=<ID=CIUP,Number=.,Type=Float,Description="Value defining the upper limit of the confidence interval of the heteroplasmy fraction">\n')	
+    out.write('##FORMAT=<ID=CIUP,Number=.,Type=Float,Description="Value defining the upper limit of the confidence interval of the heteroplasmy fraction">\n')    
     out.write('##INFO=<ID=AC,Number=.,Type=Integer,Description="Allele count in genotypes">\n')
     out.write('##INFO=<ID=AN,Number=1,Type=Integer,Description="Total number of alleles in called genotypes">\n')
         
@@ -1366,7 +1019,7 @@ def VCFoutput(dict_of_dicts, reference='RSRS'):
                             CIUP=map(lambda x:str(x), items[1][4])
                             #print CILOW,CIUP
                             confidence_interval_low=",".join(CILOW)
-                            confidence_interval_up=",".join(CIUP)							
+                            confidence_interval_up=",".join(CIUP)                            
                             individual=str(items[1][0])+':'+str(items[1][1])+':'+heteroplasmy+':'+confidence_interval_low+':'+confidence_interval_up
                         else:
                             heteroplasmy=str(items[1][2][0])                        
@@ -1417,7 +1070,7 @@ def FASTAoutput(Consensus, mtDNAseq, names):
         for dirname, dirnames, filenames in os.walk('.'):
             for subdirname in dirnames:
                 if subdirname.startswith('OUT') and subdirname == names[name2]:
-                    fasta_dir=glob.glob(os.path.join(path+'/'+subdirname))[0]				
+                    fasta_dir=glob.glob(os.path.join(path+'/'+subdirname))[0]                
                     fasta_out=open(fasta_dir+'/'+name2+'.fasta', "w")
                     fasta_out.write('>'+name2+'_complete_mitochondrial_sequence\n')
                     seq=[]
@@ -1429,31 +1082,31 @@ def FASTAoutput(Consensus, mtDNAseq, names):
                     fasta_out.close()
 
 if __name__ == '__main__':
-#	reference_seq = RSRS
-#	path = os.getcwd()
-#	dict_of_dicts = {}
-#	names = {}
-#	for dirname, dirnames, filenames in os.walk('.'):
-#		for subdirname in dirnames:
-#			if subdirname.startswith('OUT'):
-#				name2 = subdirname.split('.')[0].split('_')[1]
-#				names[name2]=subdirname
-#				samfile = glob.glob(os.path.join(path+'/'+subdirname, '*NoDuplicates.sam'))[0]
-#				mtablefile = glob.glob(os.path.join(path+'/'+subdirname, '*mtDNAassembly-table.txt'))[0]
-#				mtable=open(mtablefile, "r").readlines()
-#				sam=open(samfile, "r")
-#				Indels = mtvcf_main_analysis(mtable, sam, name2)
-#				print "#### INDELS/MISMATCHES\n\n", Indels
-#				consensus_single = get_consensus_single(Indels[Indels.keys()[0]])
-#				print "\n#### CONSENSUS OF SINGLE SEQUENCE\n\n", consensus_single
-#				dict_of_dicts.update(Indels)
-#	Consensus = get_consensus(dict_of_dicts)
-#	print Consensus
-#	VCFoutput(dict_of_dicts)
-	#FASTAoutput(Consensus, reference_seq, names)
-	#print "dict_of_dicts\n", dict_of_dicts
-	#print "Consensus", Consensus, "\n"
-	#print Consensus.keys()
-	print "This script is used only when called by assembleMTgenome.py."
-	pass
+#    reference_seq = RSRS
+#    path = os.getcwd()
+#    dict_of_dicts = {}
+#    names = {}
+#    for dirname, dirnames, filenames in os.walk('.'):
+#        for subdirname in dirnames:
+#            if subdirname.startswith('OUT'):
+#                name2 = subdirname.split('.')[0].split('_')[1]
+#                names[name2]=subdirname
+#                samfile = glob.glob(os.path.join(path+'/'+subdirname, '*NoDuplicates.sam'))[0]
+#                mtablefile = glob.glob(os.path.join(path+'/'+subdirname, '*mtDNAassembly-table.txt'))[0]
+#                mtable=open(mtablefile, "r").readlines()
+#                sam=open(samfile, "r")
+#                Indels = mtvcf_main_analysis(mtable, sam, name2)
+#                print "#### INDELS/MISMATCHES\n\n", Indels
+#                consensus_single = get_consensus_single(Indels[Indels.keys()[0]])
+#                print "\n#### CONSENSUS OF SINGLE SEQUENCE\n\n", consensus_single
+#                dict_of_dicts.update(Indels)
+#    Consensus = get_consensus(dict_of_dicts)
+#    print Consensus
+#    VCFoutput(dict_of_dicts)
+    #FASTAoutput(Consensus, reference_seq, names)
+    #print "dict_of_dicts\n", dict_of_dicts
+    #print "Consensus", Consensus, "\n"
+    #print Consensus.keys()
+    print "This script is used only when called by assembleMTgenome.py."
+    pass
 
