@@ -110,7 +110,7 @@ else:
 		#map1cmd='%s -D %s --gunzip --bunzip2 -d %s -A sam --nofails --pairmax-dna=500 --query-unk-mismatch=1 %s -n 1 -Q -O -t %i %s %s > %s 2> %s' %(gsnapexe,gsnapdb,mtdb,RG_tag,thread,fastq1,fastq2,os.path.join(folder,'outmt.sam'),os.path.join(folder,'logmt.txt'))
 		map1cmd='%s -D %s -d %s -A sam --nofails --pairmax-dna=500 --query-unk-mismatch=1 %s -n 1 -Q -O -t %i %s %s > %s 2> %s' %(gsnapexe,gsnapdb,mtdb,RG_tag,thread,fastq1,fastq2,os.path.join(folder,'outmt.sam'),os.path.join(folder,'logmt.txt'))
 	else:
-		map1cmd='%s -D %s --gunzip --bunzip2 -d %s -A sam --nofails --pairmax-dna=500 --query-unk-mismatch=1 %s -n 1 -Q -O -t %i %s > %s 2> %s' %(gsnapexe,gsnapdb,mtdb,RG_tag,thread,fastq1,os.path.join(folder,'outmt.sam'),os.path.join(folder,'logmt.txt'))
+		map1cmd='%s -D %s -d %s -A sam --nofails --pairmax-dna=500 --query-unk-mismatch=1 %s -n 1 -Q -O -t %i %s > %s 2> %s' %(gsnapexe,gsnapdb,mtdb,RG_tag,thread,fastq1,os.path.join(folder,'outmt.sam'),os.path.join(folder,'logmt.txt'))
 	print '  Mapping onto mtDNA...'
 	#print map1cmd
 	os.system(map1cmd)

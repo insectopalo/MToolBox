@@ -40,6 +40,8 @@ usage()
         -c    options for mt-classifier script [see mt-classifier.py -h for details]
         -r    reference sequence to use for read mapping (VCF output will use the same reference) [RSRS|rCRS; default: RSRS]
         -j    maximum size of memory allocation needed by SamToFastq.jar Java app (e.g. 8g, 16g...) [default: 4g]
+        -A    only align and pileup, exit before joint variant calling
+        -V    only joint variant calling
 
     Help options:
 
@@ -60,6 +62,8 @@ version()
 UseMarkDuplicates=false
 UseIndelRealigner=false
 MitoExtraction=false
+OnlyMap=false
+OnlyVarCall=false
 # Export folder where MToolBox.sh is placed, it is the same folder of PicardTools and GATK jars
 export working_dir=$(pwd)
 export mtoolbox_folder="$(dirname "$(readlink -f "$0")")"
@@ -84,14 +88,14 @@ list_is_file=false
 
 checkargs()
 {
-    if [[ $OPTARG =~ ^-[h/v/a/c/f/p/o/i/l/L/m/r/j/M/I/X]$ ]]
+    if [[ $OPTARG =~ ^-[h/v/a/c/f/p/o/i/l/L/m/r/j/M/I/X/A/V]$ ]]
     then
         echo "Option -${opt} requires an argument"
         exit 1
     fi
 }
 
-while getopts ":hva:c:f:p:o:i:l:L:m:r:j:MIX" opt; do
+while getopts ":hva:c:f:p:o:i:l:L:m:r:j:MIXAV" opt; do
     case $opt in
         h)
             usage
@@ -156,6 +160,12 @@ while getopts ":hva:c:f:p:o:i:l:L:m:r:j:MIX" opt; do
         X)
             MitoExtraction=true
             ;;                        
+        A)
+            OnlyMap=true
+            ;;                        
+        V)
+            OnlyVarCall=true
+            ;;                        
         \?)
             echo "Invalid option: -$OPTARG" >&2
             exit 1
@@ -167,7 +177,12 @@ while getopts ":hva:c:f:p:o:i:l:L:m:r:j:MIX" opt; do
     esac
 done
 
-picardtools="java -Xmx${java_mem} -jar /home/gsnido/bin/picard-tools-1.141/picard.jar"
+export picardtools="java -Xmx${java_mem} -jar /home/gsnido/bin/picard-tools-1.141/picard.jar"
+
+if ( $OnlyVarCall && $OnlyMap )
+then
+    echo "-A and -V options are incompatible. Choose only one of them or none."
+fi
 
 # define reference
 if [[ $ref == 'RCRS' ]]
@@ -260,9 +275,6 @@ in-out_folders()
 
 fastq_input()
 { # run mapExome directly.
-    echo ""
-    echo "##### EXECUTING READ MAPPING WITH MAPEXOME..."
-    echo ""
     if [[ ! "${list}" ]]
     #all the input files
     then
@@ -303,211 +315,245 @@ fastq_input()
     fi
     echo ""
         
-    for i in $sampleIDs
-    do
-        echo "mapExome.py starting at " `date`
-        if [ $input_type = 'bam' -o $input_type = 'sam' ]
-        then
-            #fastq files are in output folder
-            echo "  mapExome for sample" ${i}
-            cd ${output_name}
-        else
-            #fastq files are in input folder
-            echo "  mapExome for sample" ${i}
-        fi
-        if (( $(ls $i.*fastq* | wc -l) == 1 ))
-        then
-            #echo $i is 1
-            mapExome.py -g ${gsnapexe} -D ${gsnapdb} -M ${mtdb} -H ${humandb} -a $i.fastq* -o ${output_name}/OUT_${i} ${mapExome_OPTS}
-        elif (( $(ls $i.*fastq* | wc -l) == 2 ))
-        then
-            #echo $i is 2
-            mapExome.py -g ${gsnapexe} -D ${gsnapdb} -M ${mtdb} -H ${humandb} -a $i.R1.fastq* -b $i.R2.fastq* -o ${output_name}/OUT_${i} ${mapExome_OPTS}
-        elif (( $(ls $i.*fastq* | wc -l) == 3 ))
-        then
-            if [ -s $i.fastq* ] 
-            then 
-                if [ -s $i.R1.fastq* -a -s $i.R2.fastq* ]
-                then
-                    mapExome.py -g ${gsnapexe} -D ${gsnapdb} -M ${mtdb} -H ${humandb} -a $i.R1.fastq* -b $i.R2.fastq* -c $i.fastq* -o ${output_name}/OUT_${i} ${mapExome_OPTS}
-                else 
-                    rm $i.R1.fastq*
-                    rm $i.R2.fastq*
-                    echo "WARNING: $i.R1/R2.fastq are empty paired end fastq. Files have been removed."
-                    mapExome.py -g ${gsnapexe} -D ${gsnapdb} -M ${mtdb} -H ${humandb} -a $i.fastq* -o ${output_name}/OUT_${i} ${mapExome_OPTS}
-                fi
-            else    
-                rm $i.fastq*
-                echo "WARNING: $i.fastq is an empty unpaired fastq. File has been removed."
-                mapExome.py -g ${gsnapexe} -D ${gsnapdb} -M ${mtdb} -H ${humandb} -a $i.R1.fastq* -b $i.R2.fastq* -o ${output_name}/OUT_${i} ${mapExome_OPTS}
-            fi            
-        else (( $(ls $i.*fastq* | wc -l) > 3 ))
-            echo "WARNING: $i not processed. Too many files."
-        fi
-        echo "mapExome.py finished at " `date`
-        echo ""
-    done
-    echo ""
-
-    if [ $input_type = 'bam' -o $input_type = 'sam' ]
+    if ! $OnlyVarCall 
     then
-        echo "  Compression of fastq files from bam/sam input files..."
-        mkdir ${output_name}/processed_fastq
+        echo ""
+        echo "##### EXECUTING READ MAPPING WITH MAPEXOME..."
+        echo ""
         for i in $sampleIDs
         do
-        mv $i*fastq ${output_name}/processed_fastq
-    done
-        cd ${output_name}                            
-        tar czf processed_fastq.tar.gz processed_fastq
-        rm -r processed_fastq 
-        echo "Success."
-    fi
+            echo "mapExome.py starting at " `date`
+            if [ $input_type = 'bam' -o $input_type = 'sam' ]
+            then
+                #fastq files are in output folder
+                echo "  mapExome for sample" ${i}
+                cd ${output_name}
+            else
+                #fastq files are in input folder
+                echo "  mapExome for sample" ${i}
+            fi
+            if (( $(ls $i.*fastq* | wc -l) == 1 ))
+            then
+                #echo $i is 1
+                mapExome.py -g ${gsnapexe} -D ${gsnapdb} -M ${mtdb} -H ${humandb} -a $i.fastq* -o ${output_name}/OUT_${i} ${mapExome_OPTS}
+            elif (( $(ls $i.*fastq* | wc -l) == 2 ))
+            then
+                #echo $i is 2
+                mapExome.py -g ${gsnapexe} -D ${gsnapdb} -M ${mtdb} -H ${humandb} -a $i.R1.fastq* -b $i.R2.fastq* -o ${output_name}/OUT_${i} ${mapExome_OPTS}
+            elif (( $(ls $i.*fastq* | wc -l) == 3 ))
+            then
+                if [ -s $i.fastq* ] 
+                then 
+                    if [ -s $i.R1.fastq* -a -s $i.R2.fastq* ]
+                    then
+                        mapExome.py -g ${gsnapexe} -D ${gsnapdb} -M ${mtdb} -H ${humandb} -a $i.R1.fastq* -b $i.R2.fastq* -c $i.fastq* -o ${output_name}/OUT_${i} ${mapExome_OPTS}
+                    else 
+                        rm $i.R1.fastq*
+                        rm $i.R2.fastq*
+                        echo "WARNING: $i.R1/R2.fastq are empty paired end fastq. Files have been removed."
+                        mapExome.py -g ${gsnapexe} -D ${gsnapdb} -M ${mtdb} -H ${humandb} -a $i.fastq* -o ${output_name}/OUT_${i} ${mapExome_OPTS}
+                    fi
+                else    
+                    rm $i.fastq*
+                    echo "WARNING: $i.fastq is an empty unpaired fastq. File has been removed."
+                    mapExome.py -g ${gsnapexe} -D ${gsnapdb} -M ${mtdb} -H ${humandb} -a $i.R1.fastq* -b $i.R2.fastq* -o ${output_name}/OUT_${i} ${mapExome_OPTS}
+                fi            
+            else (( $(ls $i.*fastq* | wc -l) > 3 ))
+                echo "WARNING: $i not processed. Too many files."
+            fi
+            echo "mapExome.py finished at " `date`
+            echo ""
+        done
+        echo ""
 
-    cd ${output_name}
-    
-    echo "SAM files post-processing..."
-    echo ""
-
-    # SOFT-CLIP READS THAT HANG OFF THE ENDS OF THE CHROMOSOME
-    echo "##### SOFTCLIPPING OUT.sam WITH PICARDTOOLS..."
-    echo ""
-    for i in $(ls -d OUT_*)
-    do
-        cd ${i}
-        ${picardtools} CleanSam \
-         INPUT=OUT.sam \
-         OUTPUT=OUT.sc.sam
-        check_exit_status
-        mv OUT.sam OUT.bk.sam
-        mv OUT.sc.sam OUT.sam
-        cd ..
-    done
-
-    # SORT SAM WITH PICARD TOOLS
-    echo "##### SORTING OUT.sam FILES WITH PICARDTOOLS..."
-    echo ""
-    for i in $(ls -d OUT_*)
-    do
-        cd ${i}
-        #java -Xmx${java_mem} -Djava.io.tmpdir=`pwd`/tmp -jar ${externaltoolsfolder}/SortSam.jar \
-        ${picardtools} SortSam \
-         SORT_ORDER=coordinate \
-         INPUT=OUT.sam \
-         OUTPUT=OUT.sam.bam \
-         TMP_DIR=`pwd`/tmp \
-         VALIDATION_STRINGENCY=LENIENT
-        check_exit_status
-        cd ..
-    done
-
-    # INDEXING BAM FILES WITH SAMTOOLS
-    echo "##### INDEXING BAM FILES WITH SAMTOOLS..."
-    echo ""
-    for i in $(ls -d OUT_*)
-    do
-        cd ${i}
-        ${samtoolsexe} index OUT.sam.bam
-        check_exit_status
-        cd ..
-    done
-
-    if $UseIndelRealigner -o $UseMarkDuplicates
-    then
-        # REALIGN KNOWN INDELS WITH GATK
-        if $UseIndelRealigner
+        if [ $input_type = 'bam' -o $input_type = 'sam' ]
         then
-            echo "##### REALIGNING KNOWN INDELS WITH GATK IndelRealigner..."
-            echo ""
-            for i in $(ls -d OUT_*)
+            echo "  Compression of fastq files from bam/sam input files..."
+            mkdir ${output_name}/processed_fastq
+            for i in $sampleIDs
             do
-                cd ${i}
-                echo "Realigning known indels for file" ${i}"/OUT.sam.bam using" ${mtoolbox_folder}"data/MITOMAP_HMTDB_known_indels.vcf as reference..."
-                java -Xmx${javamem} -Djava.io.tmpdir=`pwd`/tmp -jar ${externaltoolsfolder}/GenomeAnalysisTK.jar \
-                 -T IndelRealigner \
-                 -R ${mtoolbox_folder}/data/chr${ref}.fa \
-                 -I OUT.sam.bam \
-                 -m OUT.realigned.bam \
-                 -targetIntervals ${mtoolbox_folder}/data/intervals_file_${ref}.list  \
-                 -known ${mtoolbox_folder}/data/MITOMAP_HMTDB_known_indels_${ref}.vcf \
-                 -compress 0
-                check_exit_status
-                cd ..
-            done
-        else
-            echo "WARNING: skipping indel realignment."
-            echo ""
-            for i in $(ls -d OUT_*)
-            do
-                cd ${i}
-                cp OUT.sam.bam OUT.realigned.bam
-                cd ..
-            done
+            mv $i*fastq ${output_name}/processed_fastq
+        done
+            cd ${output_name}                            
+            tar czf processed_fastq.tar.gz processed_fastq
+            rm -r processed_fastq 
+            echo "Success."
         fi
-        # MARK DUPLICATES WITH PICARD TOOLS
-        if $UseMarkDuplicates
-        then
-            echo "##### ELIMINATING PCR DUPLICATES WITH PICARDTOOLS MarkDuplicates..."
-            echo ""
-            for i in $(ls -d OUT_*)
-            do
-                cd ${i}
-                ${picardtools} MarkDuplicates \
-                #java -Xmx${javamem} -Djava.io.tmpdir=`pwd`/tmp -jar ${externaltoolsfolder}/MarkDuplicates.jar \
-                 INPUT=OUT.realigned.bam \
-                 OUTPUT=OUT.marked.bam \
-                 METRICS_FILE=OUT.marked.metrics.txt \
-                 ASSUME_SORTED=true \
-                 REMOVE_DUPLICATES=true \
-                 TMP_DIR=`pwd`/tmp
-                 cd ..
-             done
-        else
-            echo "WARNING: skipping duplicate marking"
-            for i in $(ls -d OUT_*)
-            do
-                cd ${i}
-                cp OUT.realigned.bam OUT.marked.bam
-                cd ..
-            done
-        fi
-    else
-        echo "WARNING: skipping indel realignment and duplicate marking"
+
+        cd ${output_name}
+        
+        echo "SAM files post-processing..."
+        echo ""
+
+        # SOFT-CLIP READS THAT HANG OFF THE ENDS OF THE CHROMOSOME
+        echo "##### SOFTCLIPPING OUT.sam WITH PICARDTOOLS..."
         echo ""
         for i in $(ls -d OUT_*)
         do
             cd ${i}
-            cp OUT.sam.bam OUT.marked.bam
+            ${picardtools} CleanSam \
+             INPUT=OUT.sam \
+             OUTPUT=OUT.sc.sam
+            check_exit_status
+            mv OUT.sam OUT.bk.sam
+            mv OUT.sc.sam OUT.sam
             cd ..
         done
+
+        # SORT SAM WITH PICARD TOOLS
+        echo "##### SORTING OUT.sam FILES WITH PICARDTOOLS..."
+        echo ""
+        for i in $(ls -d OUT_*)
+        do
+            cd ${i}
+            #java -Xmx${java_mem} -Djava.io.tmpdir=`pwd`/tmp -jar ${externaltoolsfolder}/SortSam.jar \
+            ${picardtools} SortSam \
+             SORT_ORDER=coordinate \
+             INPUT=OUT.sam \
+             OUTPUT=OUT.sam.bam \
+             TMP_DIR=`pwd`/tmp \
+             VALIDATION_STRINGENCY=LENIENT
+            check_exit_status
+            cd ..
+        done
+
+        # INDEXING BAM FILES WITH SAMTOOLS
+        echo "##### INDEXING BAM FILES WITH SAMTOOLS..."
+        echo ""
+        for i in $(ls -d OUT_*)
+        do
+            cd ${i}
+            ${samtoolsexe} index OUT.sam.bam
+            check_exit_status
+            cd ..
+        done
+
+        if $UseIndelRealigner -o $UseMarkDuplicates
+        then
+            # REALIGN KNOWN INDELS WITH GATK
+            if $UseIndelRealigner
+            then
+                echo "##### REALIGNING KNOWN INDELS WITH GATK IndelRealigner..."
+                echo ""
+                for i in $(ls -d OUT_*)
+                do
+                    cd ${i}
+                    echo "Realigning known indels for file" ${i}"/OUT.sam.bam using" ${mtoolbox_folder}"data/MITOMAP_HMTDB_known_indels.vcf as reference..."
+                    java -Xmx${javamem} -Djava.io.tmpdir=`pwd`/tmp -jar ${externaltoolsfolder}/GenomeAnalysisTK.jar \
+                     -T IndelRealigner \
+                     -R ${mtoolbox_folder}/data/chr${ref}.fa \
+                     -I OUT.sam.bam \
+                     -m OUT.realigned.bam \
+                     -targetIntervals ${mtoolbox_folder}/data/intervals_file_${ref}.list  \
+                     -known ${mtoolbox_folder}/data/MITOMAP_HMTDB_known_indels_${ref}.vcf \
+                     -compress 0
+                    check_exit_status
+                    cd ..
+                done
+            else
+                echo "WARNING: skipping indel realignment."
+                echo ""
+                for i in $(ls -d OUT_*)
+                do
+                    cd ${i}
+                    cp OUT.sam.bam OUT.realigned.bam
+                    cd ..
+                done
+            fi
+            # MARK DUPLICATES WITH PICARD TOOLS
+            if $UseMarkDuplicates
+            then
+                echo "##### ELIMINATING PCR DUPLICATES WITH PICARDTOOLS MarkDuplicates..."
+                echo ""
+                for i in $(ls -d OUT_*)
+                do
+                    cd ${i}
+                    ${picardtools} MarkDuplicates \
+                    #java -Xmx${javamem} -Djava.io.tmpdir=`pwd`/tmp -jar ${externaltoolsfolder}/MarkDuplicates.jar \
+                     INPUT=OUT.realigned.bam \
+                     OUTPUT=OUT.marked.bam \
+                     METRICS_FILE=OUT.marked.metrics.txt \
+                     ASSUME_SORTED=true \
+                     REMOVE_DUPLICATES=true \
+                     TMP_DIR=`pwd`/tmp
+                     cd ..
+                 done
+            else
+                echo "WARNING: skipping duplicate marking"
+                for i in $(ls -d OUT_*)
+                do
+                    cd ${i}
+                    cp OUT.realigned.bam OUT.marked.bam
+                    cd ..
+                done
+            fi
+        else
+            echo "WARNING: skipping indel realignment and duplicate marking"
+            echo ""
+            for i in $(ls -d OUT_*)
+            do
+                cd ${i}
+                cp OUT.sam.bam OUT.marked.bam
+                cd ..
+            done
+        fi
+
+        # RE-CONVERT BAM OUTPUT FROM MARKDUPLICATES IN SAM
+        echo "##### RE-CONVERTING BAM => SAM..."
+        echo ""
+        for i in $(ls -d OUT_*)
+        do
+            cd ${i}
+            ${picardtools} SamFormatConverter \
+             INPUT=OUT.marked.bam \
+             OUTPUT=OUT2.with_header.sam \
+             TMP_DIR=`pwd`/tmp \
+             VALIDATION_STRINGENCY=LENIENT
+            check_exit_status
+            cd ..
+        done
+
+        for i in $(ls -d OUT_*)
+        do
+            cd ${i}
+            grep -v "^@" OUT2.with_header.sam > OUT2.sam
+            mkdir MarkTmp
+            mv OUT.sam.bam MarkTmp
+            mv OUT.realigned.bam MarkTmp 2> /dev/null
+            mv OUT.marked.bam MarkTmp
+            tar -czf MarkTmp.tar.gz MarkTmp
+            rm -R MarkTmp/
+            cd ..
+        done
+
+        echo "##### CONVERTING OUT2.sam to OUT2.bam, SORTING AND INDEXING..."
+        echo ""
+        for i in $(ls -d OUT_*)
+        do
+            cd ${i}
+            ${samtoolsexe} view -bt ${fasta_path}/${mtdb_fasta}.fai OUT2.sam > OUT2.bam
+            ${samtoolsexe} sort OUT2.bam OUT2-sorted
+            ${samtoolsexe} index OUT2-sorted.bam
+            cd ..
+        done
+        
+        echo "##### WRITING pileup FILE..."
+        echo ""
+        for i in $(ls -d OUT_*)
+        do
+            cd ${i}
+            ${samtoolsexe} mpileup -B -d 500000 -f ${fasta_path}/${mtdb_fasta} OUT2-sorted.bam > OUT2.pileup
+            cd ..
+        done
+
+        if $OnlyMap
+        then 
+            echo "Mapping and pileup completed, exiting because fo -A flag"
+            exit 0
+        fi
+    else
+        cd ${output_name}
     fi
-
-    # RE-CONVERT BAM OUTPUT FROM MARKDUPLICATES IN SAM
-    echo "##### RE-CONVERTING BAM => SAM..."
-    echo ""
-    for i in $(ls -d OUT_*)
-    do
-        cd ${i}
-        ${picardtools} SamFormatConverter \
-         INPUT=OUT.marked.bam \
-         OUTPUT=OUT2.with_header.sam \
-         TMP_DIR=`pwd`/tmp \
-         VALIDATION_STRINGENCY=LENIENT
-        check_exit_status
-        cd ..
-    done
-
-    for i in $(ls -d OUT_*)
-    do
-        cd ${i}
-        grep -v "^@" OUT2.with_header.sam > OUT2.sam
-        mkdir MarkTmp
-        mv OUT.sam.bam MarkTmp
-        mv OUT.realigned.bam MarkTmp 2> /dev/null
-        mv OUT.marked.bam MarkTmp
-        tar -czf MarkTmp.tar.gz MarkTmp
-        rm -R MarkTmp/
-        cd ..
-    done
 
     # ASSEMBLE CONTIGS, GET MT-TABLES...
     echo "##### ASSEMBLING MT GENOMES WITH assembleMTgenome.py..."
@@ -518,9 +564,8 @@ fastq_input()
     do
         outhandle=$(echo ${i} | sed 's/OUT_//g')
         cd ${i}
-        echo CMD=\`assembleMTgenome.py -i OUT2.sam -o ${outhandle} -r ${fasta_path} -f ${mtdb_fasta} -a ${hg19_fasta} -s ${samtoolsexe} -FCP ${assembleMTgenome_OPTS}\`
-        assembleMTgenome.py -i OUT2.sam -o ${outhandle} -r ${fasta_path} -f ${mtdb_fasta} -a ${hg19_fasta} -s ${samtoolsexe} -FCP ${assembleMTgenome_OPTS}
-        check_exit_status
+        #echo CMD=\`assembleMTgenome.py -i OUT2.sam -o ${outhandle} -r ${fasta_path} -f ${mtdb_fasta} -a ${hg19_fasta} -s ${samtoolsexe} -FCP ${assembleMTgenome_OPTS}\`
+        assembleMTgenome.py -i OUT2.pileup -o ${outhandle} -r ${fasta_path} -f ${mtdb_fasta} -a ${hg19_fasta} -s ${samtoolsexe} -FCP ${assembleMTgenome_OPTS}
         cd ..
     done > logassemble.txt
 

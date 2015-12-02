@@ -136,7 +136,7 @@ def which_mhcs_lite(best_haplo, mhcs_dict):
         name = recode_haplo[f]
         # seq = mhcs_dict[name]
     elif f in ['H', 'J', 'L', 'R', 'T']:
-        print "I'm looking for", best_haplo
+        # print "I'm looking for", best_haplo
         # specific criteria for getting MHCS
         name, seq = subparse2mhcs(best_haplo,mhcs_dict)
     else:
