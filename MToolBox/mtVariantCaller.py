@@ -16,17 +16,6 @@ def varnames(i):
     mate=int(i[6])
     return CIGAR, readNAME, seq, qs, refposleft, mate#, refposright
 
-#defines global variables for MT-table parsing
-def varnames2(b,i):
-    global Position, Ref, Cov, A,C,G,T
-    Position=int((i[0]).strip())
-    Ref=(i[1]).strip()
-    Cov=int((i[3]).strip())
-    A=b[0]
-    C=b[1]
-    G=b[2]
-    T=b[3]
-    return Position, Ref, Cov, A,C,G,T
 #Heteroplasmic fraction quantification
 def heteroplasmy(cov, Covbase):
     try:
@@ -68,7 +57,7 @@ def mean(list):
         m=0
         return m
 
-def callDeletion(readNAME,mate,index,CIGAR,seq,qs,refposleft,tail=5):
+def callDeletion(readNAME,mate,index,CIGAR,seq,qs,refposleft,tail):
     if mate>0:
         strand='mate1'
     elif mate==0:
@@ -90,6 +79,7 @@ def callDeletion(readNAME,mate,index,CIGAR,seq,qs,refposleft,tail=5):
         cigarComponents.pop(-1)
     # Find position of the Deletion number "index"
     position=0
+    local_pos=0
     delCount=0
     delSize=0
     flankL=0
@@ -100,16 +90,21 @@ def callDeletion(readNAME,mate,index,CIGAR,seq,qs,refposleft,tail=5):
         size=int(size)
         if side=='L':
             if re.search('S',event):
+                local_pos+=size
+            elif re.search('M',event):
                 position=position+size
-            elif re.search('[MI]',event):
-                position=position+size
+                local_pos+=size
                 flankL=flankL+size
+            elif re.search('I',event):
+                flankL=flankL+size
+                local_pos+=size
             elif re.search('D',event):
                 if index == delCount:
                     delSize=size
                     side='R'
                 else:
                     delCount=delCount+1
+                    position=position+size
             elif re.search('[PN]',event):
                 continue
             else:
@@ -131,11 +126,11 @@ def callDeletion(readNAME,mate,index,CIGAR,seq,qs,refposleft,tail=5):
     #print "flankR=%i" %flankR
     qsDel=[]
     if flankL>=tail and flankR>=tail:
-        qsDel.append(median(list(map(lambda x: ord(x)-33,list(qs)[(position-5):position]))))
-        qsDel.append(median(list(map(lambda x: ord(x)-33,list(qs)[(position-5):position]))))
+        qsDel.append(median(list(map(lambda x: ord(x)-33,list(qs)[(local_pos-5):local_pos]))))
+        qsDel.append(median(list(map(lambda x: ord(x)-33,list(qs)[(local_pos-5):local_pos]))))
     else:
         qsDel='delete'
-    refDelStart=refposleft+flankL+1
+    refDelStart=refposleft+position
     refDelEnd=refDelStart+delSize
     res=[]
     res.append('Del')
@@ -146,7 +141,7 @@ def callDeletion(readNAME,mate,index,CIGAR,seq,qs,refposleft,tail=5):
     res.append(qsDel)
     return res
 
-def callInsertion(readNAME,mate,index,CIGAR,seq,qs,refposleft,tail=5):
+def callInsertion(readNAME,mate,index,CIGAR,seq,qs,refposleft,tail):
     if mate>0:
         strand='mate1'
     elif mate==0:
@@ -168,6 +163,7 @@ def callInsertion(readNAME,mate,index,CIGAR,seq,qs,refposleft,tail=5):
         cigarComponents.pop(-1)
     # Find position of the Insertion number "index"
     position=0
+    local_pos=0
     insCount=0
     insSize=0
     flankL=0
@@ -178,21 +174,26 @@ def callInsertion(readNAME,mate,index,CIGAR,seq,qs,refposleft,tail=5):
         size=int(size)
         if side=='L':
             if re.search('S',event):
-                position=position+size
+                local_pos+=size
             elif re.search('M',event):
                 position=position+size
+                local_pos+=size
                 flankL=flankL+size
+            elif re.search('D',event):
+                position=position+size
             elif re.search('I',event):
                 if index == insCount:
                     insSize=size
                     side='R'
                 else:
                     insCount=insCount+1
-            elif re.search('[DPN]',event):
+                    flankL=flankL+size
+                    local_pos+=size
+            elif re.search('[PN]',event):
                 continue
             else:
                 sys.stderr.write("Unknown character in CIGAR string (%s)\n" % event)
-                return ['Del',readNAME,strand,0,[0],'delete']
+                return ['Ins',readNAME,strand,0,[0],'delete']
         else:
             if re.search('[MI]',event):
                 flankR=flankR+size
@@ -200,20 +201,20 @@ def callInsertion(readNAME,mate,index,CIGAR,seq,qs,refposleft,tail=5):
                 continue
             else:
                 sys.stderr.write("Unknown character in CIGAR string (%s)\n" % event)
-                return ['Del',readNAME,strand,0,[0],'delete']
+                return ['Ins',readNAME,strand,0,[0],'delete']
     #print "FINAL VALUES ==============="
     #print "position=%i" % position
     #print "insCount=%i" % insCount
     #print "insSize=%i"% insSize
     #print "flankL=%i" % flankL
     #print "flankR=%i" %flankR
-    Ins=seq[position:(position+insSize)]
+    Ins=seq[local_pos:(local_pos+insSize)]
     qsIns=[]
     if flankL>=tail and flankR>=tail:
-        qsIns=list(map(lambda x: ord(x)-33,list(qs)[position:(position+insSize)]))
+        qsIns=list(map(lambda x: ord(x)-33,list(qs)[local_pos:(local_pos+insSize)]))
     else:
         qsIns='delete'
-    refInsStart=refposleft+flankL
+    refInsStart=refposleft+position
     res=[]
     res.append('Ins')
     res.append(readNAME)
@@ -222,36 +223,6 @@ def callInsertion(readNAME,mate,index,CIGAR,seq,qs,refposleft,tail=5):
     res.append(Ins)
     res.append(qsIns)
     return res
-
-#defines function searching for point mutations. It produces both the consensus base and variant(s) as output 
-def findmutations(A,C,G,T,Position, Ref, Cov):
-    oo = []
-    var=[]
-    bases=[]
-    if A>=5:
-        var.append(A)
-        bases.append('A')
-    if C>=5:
-        var.append(C)
-        bases.append('C')
-    if G>=5:
-        var.append(G)
-        bases.append('G')
-    if T>=5:
-        var.append(T)
-        bases.append('T')
-    if len(var)>=2:
-        if Ref in bases:
-            indexRef=bases.index(Ref)
-            bases.remove(Ref)
-            var.remove(var[indexRef])
-        o=[Position, Ref, Cov, bases, var]
-        return o
-    elif len(var)==1 and Ref not in bases:
-        o=[Position, Ref, Cov, bases, var]
-        return o
-    else:    
-        return oo
 
 #Wilson confidence interval lower bound
 def CIW_LOW(het, Covbase):
@@ -348,10 +319,9 @@ def getIUPAC(ref_var, dIUPAC):
     return iupac_code
             
 
-def mtvcf_main_analysis(mtable, sam, name2, tail=5):
+def mtvcf_main_analysis(mtable, sam, name2, cov_th, indel_obs, tail):
     mtable=[i.split('\t') for i in mtable]
     mtable.remove(mtable[0])
-    sam=sam.readlines()
     sam=[i.split('\t') for i in sam]
     #table of description of CIGAR characters
     #M=alignment match (can be match or mismatch)
@@ -393,23 +363,29 @@ def mtvcf_main_analysis(mtable, sam, name2, tail=5):
     dic={}
     dic['Ins']=[]
     dic['Del']=[]
-    print "\n\nsearching for indels in {0}.. please wait...\n\n".format(name2)
+    print "\nSearching for indels in {0}.. please wait...\n".format(name2)
     for i in sam:
         [CIGAR, readNAME, seq, qs, refposleft, mate] = varnames(i)
         # Look for ALL deletions present in the read
-        for i in range(0,CIGAR.count('D')):
-            r=callDeletion(readNAME,mate,i,CIGAR,seq, qs,refposleft,tail=tail)
+        for j in range(0,CIGAR.count('D')):
+            r=callDeletion(readNAME,mate,j,CIGAR,seq, qs,refposleft,tail)
             dic[r[0]].append(r[1:])
         # Look for ALL insertions present in the read
-        for i in range(0,CIGAR.count('I')):
-            r=callInsertion(readNAME,mate,i,CIGAR,seq, qs,refposleft,tail=tail)
+        for j in range(0,CIGAR.count('I')):
+            r=callInsertion(readNAME,mate,j,CIGAR,seq, qs,refposleft,tail)
             dic[r[0]].append(r[1:])
-            
+
+    print " INS=%i" % len(dic['Ins'])
+    print " DEL=%i" % len(dic['Del'])
     #############
+    print "Filtering indels with too short flanking regions..."
+    lostIns=0
+    lostDel=0
     rposIns={}
     rposDel={}
     for i in dic['Ins']:
         if i[-1] == 'delete':
+            lostIns=lostIns+1
             continue
         if i[2] not in rposIns:
             rposIns[i[2]]=[]
@@ -419,16 +395,19 @@ def mtvcf_main_analysis(mtable, sam, name2, tail=5):
 
     for i in dic['Del']:
         if i[-1]=='delete':
+            lostDel=lostDel+1
             continue
         if i[2] not in rposDel:
             rposDel[i[2]]=[]            
             rposDel[i[2]].append(i[3:])
         else:
             rposDel[i[2]].append(i[3:])
+    print " INS=%i/%i" % (len(dic['Ins'])-lostIns, len(dic['Ins']))
+    print " DEL=%i/%i" % (len(dic['Del'])-lostDel, len(dic['Del']))
     ############
+    print "Filtering indels with too low QSs"
     dicqsDel={}
     dicqsIns={}
-    #########
     for i in rposIns:
         dicqsIns[i]=[]
         for x in rposIns.get(i):
@@ -438,7 +417,7 @@ def mtvcf_main_analysis(mtable, sam, name2, tail=5):
                 else:
                     x[-1][j]='-'
             if '-' in x[-1]:
-                pass
+                lostIns=lostIns+1
             else:
                 dicqsIns[i].append(x)
     ################
@@ -451,12 +430,15 @@ def mtvcf_main_analysis(mtable, sam, name2, tail=5):
                 else:
                     x[-1][j]='-'
             if '-' in x[-1]:
-                pass
+                lostDel=lostDel+1
             else:
                 dicqsDel[i].append(x)
-    #print "dicqsIns is", dicqsIns
-    #print "dicqsDel is", dicqsDel
+    print " INS=%i/%i" % (len(dic['Ins'])-lostIns, len(dic['Ins']))
+    print " DEL=%i/%i" % (len(dic['Del'])-lostDel, len(dic['Del']))
     ##########
+    print "Filtering indels with less than", indel_obs, "observations"
+    totIns=0
+    totDel=0
     dicIns={}
     dicDel={}
     for i in dicqsIns:
@@ -467,10 +449,11 @@ def mtvcf_main_analysis(mtable, sam, name2, tail=5):
             b.append(str(j[0]))
         s=set(b)
         for x in s:
-            if b.count(x)>=5:
+            if b.count(x)>=indel_obs:
                 for z in a:
-                    if x in z:
+                    if x==z[0]:
                         dicIns[i].append(z)
+                        totIns+=1
     for i in dicqsDel:
         dicDel[i]=[]
         b=[]
@@ -484,8 +467,13 @@ def mtvcf_main_analysis(mtable, sam, name2, tail=5):
                 for z in a:
                     if x==str(z[0]):
                         dicDel[i].append(z)
-    #print "dicIns is", dicIns
-    #print "dicDel is", dicDel
+                        totDel=totDel+1
+    print " INS=%i/%i" % (totIns, len(dic['Ins']))
+    print " DEL=%i/%i" % (totDel, len(dic['Del']))
+    ###########
+    print "Collapsing indels into single unique events"
+    totIns=0
+    totDel=0
     Final={}
     for i in dicIns:
         Final[i]=[]
@@ -509,6 +497,7 @@ def mtvcf_main_analysis(mtable, sam, name2, tail=5):
                     bases1.append(z)
                     qs1.append(median(qs2))
                     depth.append(n)
+                    totIns=totIns+1
             r=['ins', bases1, qs1, depth]
             Final[i].append(r)
     for i in dicDel:
@@ -533,6 +522,7 @@ def mtvcf_main_analysis(mtable, sam, name2, tail=5):
                         bases1.append(z)
                         qs1.append(median(qs2))
                         depth.append(n)
+                        totDel=totDel+1
                 r=['del', bases1, qs1, depth]
                 Final[i].append(r)
         else:
@@ -559,7 +549,10 @@ def mtvcf_main_analysis(mtable, sam, name2, tail=5):
                         depth.append(n)
                 r=['del', bases1, qs1, depth]
                 Final[i].append(r)
+
     ref=sorted(Final)
+    print " INS=%i/%i" % (totIns, len(dic['Ins']))
+    print " DEL=%i/%i" % (totDel, len(dic['Del']))
     #print name2, "ref is", ref
     Indels={}
     Indels[name2]=[]
@@ -620,36 +613,53 @@ def mtvcf_main_analysis(mtable, sam, name2, tail=5):
                         Refbase.append(mtDNAseq[delflank:delfinal])
                     dele=[(dels[0]-1), Refbase, Covbase, deletions, DelCov, qs, hetfreq, het_ci_low, het_ci_up, 'del']
                     Indels[name2].append(dele)
-    #print name2, "Indels:", Indels
     Subst={}
     Subst[name2] = []
-    print "\n\nsearching for mismatches in {0}.. please wait...\n\n".format(name2)
+    print "\nSearching for mismatches in {0}.. please wait...\n".format(name2)
     for i in mtable:
         b=ast.literal_eval((i[-1]).strip())
-        # print b
-        varnames2(b,i)
-        #print "varnames2 is", varnames2(b,i)
-        #varnames2()
-        a=findmutations(A,C,G,T,Position,Ref,Cov)
+        Position_b=int((i[0]).strip())
+        Ref_b=(i[1]).strip()
+        Cov_b=int((i[3]).strip())
+        bases=[]
+        var=[]
+        a=[]
+        if b[0]>=cov_th:
+            bases.append('A')
+            var.append(b[0])
+        if b[1]>=cov_th:
+            bases.append('C')
+            var.append(b[1])
+        if b[2]>=cov_th:
+            bases.append('G')
+            var.append(b[2])
+        if b[3]>=cov_th:
+            bases.append('T')
+            var.append(b[3])
+        if len(var)>=2:
+            if Ref_b in bases:
+                indexRef=bases.index(Ref_b)
+                bases.remove(Ref_b)
+                var.remove(var[indexRef])
+            a=[Position_b, Ref_b, Cov_b, bases, var]
+        elif len(var)==1 and Ref_b not in bases:
+            a=[Position_b, Ref_b, Cov_b, bases, var]
         if len(a) > 0:
-            hetfreq=map(lambda x:heteroplasmy(x,Cov),a[-1])        
-            if Cov<=40:
-                het_ci_low=map(lambda x: CIW_LOW(x,Cov),hetfreq)
-                het_ci_up=map(lambda x: CIW_UP(x,Cov),hetfreq)
+            hetfreq=map(lambda x:heteroplasmy(x,Cov_b),a[-1])        
+            if Cov_b<=40:
+                het_ci_low=map(lambda x: CIW_LOW(x,Cov_b),hetfreq)
+                het_ci_up=map(lambda x: CIW_UP(x,Cov_b),hetfreq)
             else:
-                het_ci_low=map(lambda x: CIAC_LOW(x,Cov), a[-1])
-                het_ci_up=map(lambda x: CIAC_UP(x,Cov), a[-1])
+                het_ci_low=map(lambda x: CIAC_LOW(x,Cov_b), a[-1])
+                het_ci_up=map(lambda x: CIAC_UP(x,Cov_b), a[-1])
             a.append('PASS')
             a.append(hetfreq)
             a.append(het_ci_low)
             a.append(het_ci_up)
             a.append('mism')
             Subst[name2].append(a)
-    #print name2, "Subst:", Subst
     Indels[name2].extend(Subst[name2])
-    return Indels # it's a dictionary
-    # dict_of_dicts.update(Indels)
-    # return dict_of_dicts
+    return Indels
 
 
 ### END OF MAIN ANALYSIS
@@ -662,30 +672,62 @@ def mtvcf_main_analysis(mtable, sam, name2, tail=5):
 def get_consensus_single(i, hf=0.8):
     consensus_value = []
     if len(i) != 0:
-        #consensus_value = []
-        #for var in dict_of_dicts[i]:
         for var in i:
-            #print var[0], var[-1], max(var[6])
-            print '%i %s %.5f' % (var[0], var[-1], max(var[6]))
-            if var[-1] == 'mism' and max(var[6]) >= hf:
-                index=var[6].index(max(var[6]))
-                basevar=var[3][index]
-                res=[var[0], [basevar], 'mism']
-                consensus_value.append(res)
-                #Consensus[i].append(res)
-            elif var[-1] == 'mism' and max(var[6]) < hf:
-                basevar=[var[1]]+var[3]
-                basevar.sort()
-                a=getIUPAC(basevar, dIUPAC)
-                res=[var[0], a, 'mism']
-                consensus_value.append(res)
-                #Consensus[i].append(res)
+            # 'mism'
+            if var[-1] == 'mism':
+                sorted_indices = sorted(range(len(var[6])), key=lambda k: var[6][k], reverse=True)
+                if len(sorted_indices) == 1:
+                    if var[6][0] >= hf:
+                        basevar=var[3][0]
+                        res=[var[0], [basevar], 'mism']
+                        consensus_value.append(res)
+                    else:
+                        res=[var[0], [var[1]], 'mism']
+                        consensus_value.append(res)
+                elif len(sorted_indices) == 2:
+                    if var[6][sorted_indices[0]] >= hf:
+                        basevar=var[3][sorted_indices[0]]
+                        res=[var[0], [basevar], 'mism']
+                        consensus_value.append(res)
+                    elif var[6][sorted_indices[0]] >= hf/2 and var[6][sorted_indices[1]] >= hf/2:
+                        basevar=[var[3][sorted_indices[0]]]+[var[3][sorted_indices[1]]]
+                        basevar.sort()
+                        a=getIUPAC(basevar, dIUPAC)
+                        res=[var[0], a, 'mism']
+                        consensus_value.append(res)
+                    else:
+                        res=[var[0], [var[1]], 'mism']
+                        consensus_value.append(res)
+                elif len(sorted_indices) == 3:
+                    if var[6][sorted_indices[0]] >= hf:
+                        basevar=var[3][sorted_indices[0]]
+                        res=[var[0], [basevar], 'mism']
+                        consensus_value.append(res)
+                    elif var[6][sorted_indices[0]] >= hf/2 and var[6][sorted_indices[1]] >= hf/2:
+                        basevar=[var[3][sorted_indices[0]]]+[var[3][sorted_indices[1]]]
+                        basevar.sort()
+                        a=getIUPAC(basevar, dIUPAC)
+                        res=[var[0], a, 'mism']
+                        consensus_value.append(res)
+                    elif var[6][sorted_indices[0]] >= hf/3 and var[6][sorted_indices[1]] >= hf/3 and var[6][sorted_indices[2]] >= hf/3:
+                        basevar=[var[3][sorted_indices[0]]]+[var[3][sorted_indices[1]]]+[var[3][sorted_indices[2]]]
+                        basevar.sort()
+                        a=getIUPAC(basevar, dIUPAC)
+                        res=[var[0], a, 'mism']
+                        consensus_value.append(res)
+                    else:
+                        res=[var[0], [var[1]], 'mism']
+                        consensus_value.append(res)
+                else:
+                    res=[var[0], [var[1]], 'mism']
+                    consensus_value.append(res)
+            # 'ins'
             elif var[-1] == 'ins' and max(var[6]) >= hf:
                 index=var[6].index(max(var[6]))
                 basevar=var[3][index]
                 res=[var[0], [basevar], 'ins']
                 consensus_value.append(res)
-                #Consensus[i].append(res)
+            # 'del'
             elif var[-1] == 'del' and max(var[6]) >= hf:
                 index=var[6].index(max(var[6]))
                 basevar=var[3][index]
@@ -694,7 +736,6 @@ def get_consensus_single(i, hf=0.8):
                 end_del=start_del+del_length
                 res=[var[0], range(start_del,end_del), 'del']
                 consensus_value.append(res)
-                #Consensus[i].append(res)
             else:
                 pass
     return consensus_value
@@ -708,13 +749,16 @@ def get_consensus(dict_of_dicts):
     return Consensus
 
 def VCFoutput(dict_of_dicts, reference='RSRS'):
-    print "Reference sequence used for VCF: %s" % reference
+    print " -Reference sequence used for VCFoutput function: %s" % reference
     VCF_RECORDS = []
     present_pos = set()
     # for each sample in dict_of_dicts
+    print " -Number of samples in VCFdict=%i" % len(dict_of_dicts)
     for sample in dict_of_dicts.keys():
+        print "  ...Analyising SAMPLE %s" % sample
         #gets variants found per sample
         val = dict_of_dicts[sample]
+        print "     (%i positions with at least one variant)" % len(val)
         for variant in val:
             # if the v. position was never encountered before, is heteroplasmic and is a deletion
             if variant[0] not in present_pos and max(variant[6])<1 and variant[-1]=='del':
@@ -725,11 +769,9 @@ def VCFoutput(dict_of_dicts, reference='RSRS'):
                 r._sample_indexes[sample]=[[0]+aplotypes, variant[2],variant[6], variant[7], variant[8]]
                 #print r._sample_indexes
                 r.samples.append(sample)
-                if len(variant[3])>1:
-                    r.REF=r.REF*len(variant[3])
+                r.TYPEVAR=[variant[-1]]*len(variant[3])
                 VCF_RECORDS.append(r)
                 present_pos.add(r.POS)
-                r.TYPEVAR=[variant[-1]]*len(variant[3])
             # if the v. position was never encountered before, is heteroplasmic and is not a deletion
             elif variant[0] not in present_pos and max(variant[6])<1 and variant[-1]!='del':
                 allelecount=[1]*len(variant[3])
@@ -740,39 +782,36 @@ def VCFoutput(dict_of_dicts, reference='RSRS'):
                 r.samples.append(sample)
                 if len(variant[3])>1:
                     r.REF=r.REF*len(variant[3])                
+                r.TYPEVAR=[variant[-1]]*len(variant[3])
                 VCF_RECORDS.append(r)
                 present_pos.add(r.POS)
-                r.TYPEVAR=[variant[-1]]*len(variant[3])
                 #print r.POS, sample
             # if the v. position was never encountered before,is homoplasmic and is a deletion
             elif variant[0] not in present_pos and max(variant[6])>=1 and variant[-1]=='del':
                 allelecount=[1]*len(variant[1])
                 r = vcf.parser._Record(CHROM='chrMT', POS=variant[0], ID='.', REF=variant[1], ALT=variant[3], QUAL='.', FILTER='PASS', INFO=OrderedDict([('AC',allelecount),('AN',1)]), FORMAT='GT:DP:HF:CILOW:CIUP', sample_indexes={sample:''}, samples=[])
-                r._sample_indexes[sample]=[1,variant[2], variant[6], variant[7], variant[8]]
+                r._sample_indexes[sample]=[[1],variant[2], variant[6], variant[7], variant[8]]
                 r.samples.append(sample)
-                if len(variant[3])>1:
-                    r.REF=r.REF*len(variant[3])                
+                r.TYPEVAR=[variant[-1]]*len(variant[3])
                 VCF_RECORDS.append(r)
                 present_pos.add(r.POS)
-                r.TYPEVAR=[variant[-1]]*len(variant[3])
             # if the v. position was never encountered before,is homoplasmic and is not a deletion
             elif variant[0] not in present_pos and max(variant[6])>=1 and variant[-1]!='del':
                 allelecount=[1]*len(variant[3])
                 r = vcf.parser._Record(CHROM='chrMT', POS=variant[0], ID='.', REF=[variant[1]], ALT=variant[3], QUAL='.', FILTER='PASS', INFO=OrderedDict([('AC',allelecount),('AN',1)]), FORMAT='GT:DP:HF:CILOW:CIUP', sample_indexes={sample:''}, samples=[])
-                r._sample_indexes[sample]=[1,variant[2], variant[6], variant[7],variant[8]]
+                r._sample_indexes[sample]=[[1],variant[2], variant[6], variant[7],variant[8]]
                 r.samples.append(sample)
                 if len(variant[3])>1:
                     r.REF=r.REF*len(variant[3])
+                r.TYPEVAR=[variant[-1]]*len(variant[3])
                 VCF_RECORDS.append(r)
                 present_pos.add(r.POS)
-                r.TYPEVAR=[variant[-1]]*len(variant[3])
-                #print r.POS, sample
-            #If the v.position was encountered before
+            # If the v.position was encountered before
             elif variant[0] in present_pos and max(variant[6])<1:
                 for i in VCF_RECORDS:
                     if variant[0] == i.POS:
-                        #print i
-                        #when there are multiple variants for a position of the same individual
+                        # At least a variant in this position from this sample is in the record
+                        # and is a deletion (variant[1] is a list)
                         if sample in i.samples and type(variant[1]) == type(list()):
                             for x in xrange(len(variant[3])):
                                 if variant[3][x] in i.ALT and variant[1][x] in i.REF:
@@ -795,7 +834,7 @@ def VCFoutput(dict_of_dicts, reference='RSRS'):
                                     i._sample_indexes[sample][0].append(aplotype)
                                     i._sample_indexes[sample][2].append(variant[6][x])
                                     i._sample_indexes[sample][3].append(variant[7][x])
-                                    i._sample_indexes[sample][4].append(variant[8][x])                                    
+                                    i._sample_indexes[sample][4].append(variant[8][x])
                                 else:
                                     i.REF.append(variant[1][x])
                                     #print i.REF, variant[1], i.ALT
@@ -808,7 +847,7 @@ def VCFoutput(dict_of_dicts, reference='RSRS'):
                                     i._sample_indexes[sample][0].append(aplotype)
                                     i._sample_indexes[sample][2].append(variant[6][x])
                                     i._sample_indexes[sample][3].append(variant[7][x])
-                                    i._sample_indexes[sample][4].append(variant[8][x])                                    
+                                    i._sample_indexes[sample][4].append(variant[8][x])
                                     #print i
                         #for multiple variants of a position in different individuals
                         elif sample not in i.samples and type(variant[1]) == type(list()):
@@ -909,7 +948,7 @@ def VCFoutput(dict_of_dicts, reference='RSRS'):
                                     i._sample_indexes[sample][0].append(genotype)
                                     i._sample_indexes[sample][2].append(variant[6][0])
                                     i._sample_indexes[sample][3].append(variant[7][0])
-                                    i._sample_indexes[sample][4].append(variant[8][0])                                                                                                        
+                                    i._sample_indexes[sample][4].append(variant[8][0])
                                 else:
                                     i._sample_indexes.setdefault(sample,[genotype, variant[2], variant[6], variant[7], variant[8]])                                                                        
                                 #if a deletion, add a further reference base
@@ -930,7 +969,7 @@ def VCFoutput(dict_of_dicts, reference='RSRS'):
                                     i._sample_indexes[sample][0].append(genotype)
                                     i._sample_indexes[sample][2].append(variant[6][0])
                                     i._sample_indexes[sample][3].append(variant[7][0])
-                                    i._sample_indexes[sample][4].append(variant[8][0])                                    
+                                    i._sample_indexes[sample][4].append(variant[8][0])
                                 else:                                
                                     i._sample_indexes.setdefault(sample,[genotype, variant[2], variant[6], variant[7], variant[8]])
     for r in VCF_RECORDS:
@@ -1019,7 +1058,7 @@ def VCFoutput(dict_of_dicts, reference='RSRS'):
                             CIUP=map(lambda x:str(x), items[1][4])
                             #print CILOW,CIUP
                             confidence_interval_low=",".join(CILOW)
-                            confidence_interval_up=",".join(CIUP)                            
+                            confidence_interval_up=",".join(CIUP)
                             individual=str(items[1][0])+':'+str(items[1][1])+':'+heteroplasmy+':'+confidence_interval_low+':'+confidence_interval_up
                         else:
                             heteroplasmy=str(items[1][2][0])                        
@@ -1070,7 +1109,7 @@ def FASTAoutput(Consensus, mtDNAseq, names):
         for dirname, dirnames, filenames in os.walk('.'):
             for subdirname in dirnames:
                 if subdirname.startswith('OUT') and subdirname == names[name2]:
-                    fasta_dir=glob.glob(os.path.join(path+'/'+subdirname))[0]                
+                    fasta_dir=glob.glob(os.path.join(path+'/'+subdirname))[0]
                     fasta_out=open(fasta_dir+'/'+name2+'.fasta', "w")
                     fasta_out.write('>'+name2+'_complete_mitochondrial_sequence\n')
                     seq=[]

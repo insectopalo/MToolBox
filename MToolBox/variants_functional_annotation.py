@@ -310,9 +310,14 @@ def main_functional_analysis(merg, d, g, best, haplo, hapconto, PATH, FILENAME, 
     # DS
     #try:
     hapgs = best[samp][0].split(';')
-    print "Best haplogroup predictions for sample", samp, ":", hapgs
+    count = 1
+    tHT = len(hapgs)
     for hapgro in hapgs:
-        print "Functional annotation for haplogroup", hapgro
+        #print "Functional annotation for haplogroup", hapgro
+        print '\r%4.1f%% ' % (float(count)/float(tHT))*100,
+        sys.stdout.flush()
+
+        count = count+1
         #apro il file di output
         #o = open("output."+samp[0]+hapgro+'.txt', 'w')
         #o = open('.'.join([sys.argv[1].split('.')[0], 'extended.csv']), 'w')

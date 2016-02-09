@@ -563,9 +563,15 @@ fastq_input()
     for i in $(ls -d OUT_*)
     do
         outhandle=$(echo ${i} | sed 's/OUT_//g')
+        echo "ID $outhandle"
         cd ${i}
         #echo CMD=\`assembleMTgenome.py -i OUT2.sam -o ${outhandle} -r ${fasta_path} -f ${mtdb_fasta} -a ${hg19_fasta} -s ${samtoolsexe} -FCP ${assembleMTgenome_OPTS}\`
-        assembleMTgenome.py -i OUT2.pileup -o ${outhandle} -r ${fasta_path} -f ${mtdb_fasta} -a ${hg19_fasta} -s ${samtoolsexe} -FCP ${assembleMTgenome_OPTS}
+        if [ ! -s OUT2.pileup ]
+        then
+            echo "Pileup file for $outhandle does not exist"
+            continue
+        fi
+        assembleMTgenome.py -i OUT2.pileup -o ${outhandle} -r ${fasta_path} -f ${mtdb_fasta} -s ${samtoolsexe} -FCP ${assembleMTgenome_OPTS}
         cd ..
     done > logassemble.txt
 
